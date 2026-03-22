@@ -1,0 +1,8 @@
+[tool.pylsp-mypy]
+enabled = true
+live_mode = true
+strict = true
+exclude = ["tests/*"]
+
+[pycodestyle]
+max-line-length = 100
