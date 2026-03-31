@@ -10,3 +10,5 @@ mypy:
 	mypy --strict main.py
 cloc:
 	cloc main.py
+doctest:
+	python -m doctest main.py

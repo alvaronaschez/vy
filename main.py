@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Self, NamedTuple, Any
 from functools import partial
 import curses
+
 # import sys
 
 import wcwidth
@@ -50,6 +51,124 @@ class Cursor:
 
     def __lt__(self, other: Self) -> bool:
         return (self.y, self.x) < (other.y, other.x)
+
+
+@dataclass
+class Insert():
+    cursor: Cursor
+    text: list[str]
+
+    def __post_init__(self) -> None:
+        if self.text in [[], [""]]:
+            raise ValueError("Inserted text cannot be empty")
+
+
+@dataclass
+class Delete():
+    from_: Cursor
+    to: Cursor
+
+
+type Change = Insert | Delete
+
+
+def insert(text: list[str], cmd: Insert) -> list[str]:
+    """
+    >>> insert(["hola", "que", "tal"], Insert(Cursor(1, 1), ["uu"]))
+    ['hola', 'quuue', 'tal']
+    >>> insert(["hola", "que", "tal"], Insert(Cursor(1, 1), ["hola", "que", "tal"]))
+    ['hola', 'qhola', 'que', 'talue', 'tal']
+    >>> insert(["que", "tal"], Insert(Cursor(0, 0), ["hola", ""]))
+    ['hola', 'que', 'tal']
+    >>> insert(["hola", "que"], Insert(Cursor(1, 3), ["", "tal"]))
+    ['hola', 'que', 'tal']
+    >>> insert(["hola", "que", "tal"], Insert(Cursor(1, 1), ["", "", ""]))
+    ['hola', 'q', '', 'ue', 'tal']
+    """
+    cmd.text[0] = text[cmd.cursor.y][: cmd.cursor.x] + cmd.text[0]
+    cmd.text[-1] = cmd.text[-1] + text[cmd.cursor.y][cmd.cursor.x :]
+    return text[: cmd.cursor.y] + cmd.text + text[cmd.cursor.y + 1 :]
+
+
+def delete(text: list[str], cmd: Delete) -> list[str]:
+    """
+    >>> text = ["Lorem ipsum", "dolor sit amet,", "consectetur adipiscing elit"]
+    >>> delete(text, Delete(Cursor(0, 0), Cursor(0, 0)))
+    ['orem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(0, 6), Cursor(1, 5)))
+    ['Lorem sit amet,', 'consectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(0, 11), Cursor(1, 4)))
+    ['Lorem ipsum sit amet,', 'consectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(0, 11), Cursor(0, 11)))
+    ['Lorem ipsumdolor sit amet,', 'consectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(0, 11), Cursor(1, 15)))
+    ['Lorem ipsumconsectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(0, 6), Cursor(0, 11)))
+    ['Lorem dolor sit amet,', 'consectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(2, 27), Cursor(2, 27)))
+    ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(2, 27), Cursor(2, 27)))
+    ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
+    >>> delete(text, Delete(Cursor(2, 22), Cursor(2, 27)))
+    ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing']
+    >>> delete(text, Delete(Cursor(0, 5), Cursor(2, 21)))
+    ['Lorem elit']
+    >>> delete(text, Delete(Cursor(0, 0), Cursor(2, 27)))
+    ['']
+    """
+    first = text[: cmd.from_.y]
+    mid = [text[cmd.from_.y][: cmd.from_.x] + text[cmd.to.y][cmd.to.x + 1 :]]
+    last = text[cmd.to.y + 1 :]
+
+    if cmd.to.x == len(text[cmd.to.y]) and cmd.to.y < len(text) - 1:
+        """
+        when the cursor 'to' is at the eol position (and it is not the last line of the
+        file) we join 'mid' and the first line of 'last' because we are deleting the eol
+        """
+        last[0] = mid[0] + last[0]
+        return first + last
+    else:
+        return first + mid + last
+
+
+def apply_change(text: list[str], cmd: Change) -> list[str]:  # type: ignore[return] # noqa: E501
+    if type(cmd) is Insert:
+        return insert(text, cmd)
+    if type(cmd) is Delete:
+        return delete(text, cmd)
+
+
+# def inverse_insert(cmd: Insert) -> Delete:
+#     cursor_from = Cursor(cmd.cursor.y, cmd.cursor.x + 1)
+#     cursor_to: Cursor
+#     if len(cmd.text) == 1:
+#         cursor_to = Cursor(cmd.cursor.y, cmd.cursor.x + len(cmd.text[0]) + 1)
+#     else:  # len(cmd.text) > 1
+#         cursor_to = Cursor(cmd.cursor.y + len(cmd.text) - 1, len(cmd.text[-1]) - 1)
+#     return Delete(cursor_from, cursor_to)
+
+
+# TODO: review and test
+def inverse_insert(cmd: Insert) -> Delete:
+    x_from = cmd.cursor.y
+    y_from = cmd.cursor.x + 1
+    y_to = cmd.cursor.y + len(cmd.text) - 1
+    x_to: int
+    if len(cmd.text) == 1:
+        x_to = cmd.cursor.x + len(cmd.text[0]) + 1
+    else:  # len(cmd.text) > 1
+        x_to = len(cmd.text[-1]) - 1
+        if x_to == -1:
+            x_to = 0
+            y_to -= 1
+    return Delete(Cursor(y_from, x_from), Cursor(y_to, x_to))
+
+
+'''
+# TODO
+def inverse_delete(cmd: Delete) -> Insert:
+    pass
+'''
 
 
 class BookMark(NamedTuple):
@@ -309,11 +428,58 @@ class Key(StrEnum):
     CTRL_X = chr(24)
     CTRL_Y = chr(25)
     CTRL_Z = chr(26)
+    a = "a"
+    b = "b"
+    c = "c"
+    d = "d"
+    e = "e"
+    f = "f"
+    g = "g"
     h = "h"
+    i = "i"
     j = "j"
     k = "k"
     l = "l"  # noqa: E741
+    m = "m"
+    n = "n"
+    o = "o"
+    p = "p"
     q = "q"
+    r = "r"
+    s = "s"
+    t = "t"
+    u = "u"
+    v = "v"
+    w = "w"
+    x = "x"
+    y = "y"
+    z = "z"
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
+    E = "E"
+    F = "F"
+    G = "G"
+    H = "H"
+    I = "I"
+    J = "J"
+    K = "K"
+    L = "L"
+    M = "M"
+    N = "N"
+    O = "O"
+    P = "P"
+    Q = "Q"
+    R = "R"
+    S = "S"
+    T = "T"
+    U = "U"
+    V = "V"
+    W = "W"
+    X = "X"
+    Y = "Y"
+    Z = "Z"
 
 
 def print_view_port(view_port: ViewPort, window: curses.window) -> None:
