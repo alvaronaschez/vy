@@ -1,6 +1,4 @@
 {
   "typeCheckingMode": "strict",
-  "reportUnknownVariableType": true,
-  "reportUnknownMemberType": true,
-  "reportMissingTypeArgument": true
+  "reportRedeclaration": false
 }

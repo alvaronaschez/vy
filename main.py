@@ -13,7 +13,7 @@ import wcwidth
 
 
 def expand_tabs(s: str, tab_size: int) -> str:
-    result = []
+    result: list[str] = []
     column = 0
     for grapheme in wcwidth.iter_graphemes(s):
         if grapheme == "\t":
