@@ -92,7 +92,7 @@ class Text:
         self._apply(command)
 
         # change must go to the redo_stack instead of to the undo_stack
-        self.undo_stack.pop()
+        command = self.undo_stack.pop()
         self.redo_stack.append(command)
 
     def redo(self) -> None:
@@ -248,8 +248,9 @@ class Cursor:
                 self.position = len(self.text.data)
                 self.to_beginning_of_line()
                 return
-        if self.position < len(self.text.data):
-            self.position += 1
+            # elif self.position < len(self.text.data):
+            else:
+                self.position += 1
 
     @update_line
     def to_beginning_of_line(self) -> None:
