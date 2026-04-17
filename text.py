@@ -213,42 +213,44 @@ class Cursor:
         return new
 
     @update_line
-    def prev(self) -> None:
-        if self.position == 0:
-            return
-        self.position = wcwidth.grapheme_boundary_before(self.text.data, self.position)
+    def prev(self, n: int = 1) -> None:
+        for _ in range(n):
+            if self.position == 0:
+                return
+            self.position = wcwidth.grapheme_boundary_before(
+                self.text.data, self.position
+            )
 
     @update_line
-    def next(self) -> None:
-        if self.position == len(self.text.data):
-            return
-        increment = len(next(wcwidth.iter_graphemes(self.text.data, self.position)))
-        self.position += increment
+    def next(self, n: int = 1) -> None:
+        for _ in range(n):
+            if self.position == len(self.text.data):
+                return
+            increment = len(next(wcwidth.iter_graphemes(self.text.data, self.position)))
+            self.position += increment
 
     @update_line
-    def to_prev_line(self) -> None:
-        aux = self.text.data.rfind("\n", 0, self.position)
-        if aux == -1:
-            self.position = 0
-            return
-        else:
-            self.position = self.text.data.rfind("\n", 0, aux)
+    def to_prev_line(self, n: int = 1) -> None:
+        for _ in range(n):
+            self.position = self.text.data.rfind("\n", 0, self.position)
+            if self.position == -1:
+                self.position = 0
+                return
+        self.to_beginning_of_line()
 
-        if self.position == -1:
-            self.position = 0
-        else:
+    @update_line
+    def to_next_line(self, n: int = 1) -> None:
+        for _ in range(n):
+            self.position = self.text.data.find("\n", self.position)
+            if self.position == -1:
+                self.position = len(self.text.data)
+                self.to_beginning_of_line()
+                return
+        if self.position < len(self.text.data):
             self.position += 1
 
     @update_line
-    def to_next_line(self) -> None:
-        self.position = self.text.data.find("\n", self.position)
-        if self.position == -1:
-            self.position = len(self.text.data) - 1
-        elif self.position < len(self.text.data):
-            self.position += 1
-
-    @update_line
-    def to_begining_of_line(self) -> None:
+    def to_beginning_of_line(self) -> None:
         self.position = self.text.data.rfind("\n", 0, self.position)
         if self.position == -1:
             self.position = 0
