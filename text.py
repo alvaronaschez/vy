@@ -1,11 +1,10 @@
 from copy import copy
 from dataclasses import dataclass, field
-from functools import partial, wraps
+from functools import wraps
 from os.path import expanduser, expandvars, realpath
 from typing import Callable, Concatenate, ParamSpec, Self, TypeVar
 from weakref import WeakSet
 
-import more_itertools
 import wcwidth
 
 
@@ -118,6 +117,9 @@ class Text:
 
     def get_lines(self, begin: int, end: int) -> list[str]:
         return self.data.splitlines(keepends=True)[begin:end]
+
+    def line_count(self) -> int:
+        return self.data.count("\n") + 1
 
 
 P = ParamSpec("P")
@@ -310,6 +312,7 @@ class Insert:
         return cls(begin, original_text[begin : begin + count])
 
 
+"""
 # almost as fast as get_eol, without external dependencies
 def newline_indexes(s: str):
     i = -1
@@ -321,8 +324,7 @@ def newline_indexes(s: str):
 
 
 # fastest
+import more_itertools
+from functools import partial
 get_eol = partial(more_itertools.iter_index, value="\n")
-
-
-def line_length(text: str) -> int:
-    return text.count("\n")
+"""
