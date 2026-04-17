@@ -1,8 +1,8 @@
 from copy import copy
 from dataclasses import dataclass, field
-from functools import partial
+from functools import partial, wraps
 from os.path import expanduser, expandvars, realpath
-from typing import Self
+from typing import Callable, Concatenate, ParamSpec, Self, TypeVar
 from weakref import WeakSet
 
 import more_itertools
@@ -112,12 +112,16 @@ class Text:
         """
         Get a new cursor and subscribe it to events sent from this Text
         """
-        c = Cursor(0, self)
+        c = Cursor(self)
         self.cursors.add(c)
         return c
 
     def get_lines(self, begin: int, end: int) -> list[str]:
         return self.data.splitlines(keepends=True)[begin:end]
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 @dataclass(eq=False)
@@ -142,9 +146,36 @@ class Cursor:
         - 0 <= position <= len(text)
     """
 
-    position: int
     text: Text  # back reference
+    position: int = 0
+    line: int = 0
 
+    @staticmethod
+    def update_line(
+        func: Callable[Concatenate[Cursor, P], R],
+    ) -> Callable[Concatenate[Cursor, P], R]:
+        """
+        Method decorator to update the line cache
+        """
+
+        @wraps(func)
+        def wrapper(self: Cursor, *args: P.args, **kwargs: P.kwargs) -> R:
+            prev_position = self.position
+            result = func(self, *args, **kwargs)
+            new_position = self.position
+
+            if new_position > prev_position:
+                num_lines = self.text.data[prev_position:new_position].count("\n")
+                self.line += num_lines
+            else:
+                num_lines = self.text.data[new_position:prev_position].count("\n")
+                self.line -= num_lines
+
+            return result
+
+        return wrapper
+
+    @update_line
     def apply(self, command: Delete | Insert) -> None:
         """
         Update the cursor position in response to a text edit.
@@ -176,22 +207,25 @@ class Cursor:
                 else:
                     self.position += len(text)
 
-    def copy(self) -> Cursor:
+    def clone(self) -> Cursor:
         new = copy(self)
         self.text.cursors.add(new)
         return new
 
+    @update_line
     def prev(self) -> None:
         if self.position == 0:
             return
         self.position = wcwidth.grapheme_boundary_before(self.text.data, self.position)
 
+    @update_line
     def next(self) -> None:
         if self.position == len(self.text.data):
             return
         increment = len(next(wcwidth.iter_graphemes(self.text.data, self.position)))
         self.position += increment
 
+    @update_line
     def to_prev_line(self) -> None:
         aux = self.text.data.rfind("\n", 0, self.position)
         if aux == -1:
@@ -205,6 +239,7 @@ class Cursor:
         else:
             self.position += 1
 
+    @update_line
     def to_next_line(self) -> None:
         self.position = self.text.data.find("\n", self.position)
         if self.position == -1:
@@ -212,6 +247,7 @@ class Cursor:
         elif self.position < len(self.text.data):
             self.position += 1
 
+    @update_line
     def to_begining_of_line(self) -> None:
         self.position = self.text.data.rfind("\n", 0, self.position)
         if self.position == -1:
@@ -219,17 +255,22 @@ class Cursor:
         elif self.position < len(self.text.data):
             self.position += 1
 
+    @update_line
     def to_end_of_line(self) -> None:
         self.position = self.text.data.find("\n", self.position)
         if self.position == -1:
             self.position = len(self.text.data) - 1
 
+    @update_line
     def get_line_idx(self) -> int:
         """
         0-based index
         """
-        return len(self.text.data[: self.position + 1].splitlines()) - 1
+        # return len(self.text.data[: self.position + 1].splitlines()) - 1
+        # return self.text.data[:self.position].count("\n")
+        return self.line
 
+    '''
     def get_line_column_idx(self) -> tuple[int, int]:
         """
         0-based index
@@ -238,11 +279,13 @@ class Cursor:
         line = len(aux) - 1
         column = len(aux[-1]) - 1
         return line, column
+    '''
 
     def to_line(self, line: int) -> None:
         self.position = sum(
             map(lambda l: len(l), self.text.data.splitlines(keepends=True)[:line])
         )
+        self.line = line
 
 
 @dataclass

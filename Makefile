@@ -5,7 +5,8 @@ activate:
 debug:
 	python -m pdb -p $(pgrep python)
 format:
-	black main.py
+	isort main.py text.py
+	black main.py text.py
 mypy:
 	mypy --strict main.py
 cloc:

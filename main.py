@@ -1,15 +1,15 @@
 # from __future__ import annotations  # python < 3.14
 
+import curses
 from dataclasses import dataclass, field
 from enum import StrEnum
-from pathlib import Path
-from typing import Callable, Self, NamedTuple, Any
 from functools import partial
-import curses
-
-# import sys
+from pathlib import Path
+from typing import Any, Callable, NamedTuple, Self
 
 import wcwidth
+
+# import sys
 
 
 def expand_tabs(s: str, tab_size: int) -> str:
@@ -54,7 +54,7 @@ class Cursor:
 
 
 @dataclass
-class Insert():
+class Insert:
     cursor: Cursor
     text: list[str]
 
@@ -64,7 +64,7 @@ class Insert():
 
 
 @dataclass
-class Delete():
+class Delete:
     from_: Cursor
     to: Cursor
 
@@ -164,11 +164,11 @@ def inverse_insert(cmd: Insert) -> Delete:
     return Delete(Cursor(y_from, x_from), Cursor(y_to, x_to))
 
 
-'''
+"""
 # TODO
 def inverse_delete(cmd: Delete) -> Insert:
     pass
-'''
+"""
 
 
 class BookMark(NamedTuple):
@@ -515,7 +515,8 @@ def main() -> None:
             read_key=read_key,
             get_view_port_size=get_view_port_size,
             print_=print_,
-            file_path="main.py",
+            # file_path="main.py",
+            file_path="sqlite3.c",
         ).run()
 
 
