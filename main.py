@@ -1,16 +1,22 @@
 # from __future__ import annotations  # python < 3.14
 
 import curses
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from functools import partial
-from pathlib import Path
 from typing import Any, Callable, NamedTuple, Self
 
 import wcwidth
 
 # import sys
 
+from text import Text, Cursor as TextCursor
+
+def get_width(grapheme: str) -> int:
+    if grapheme == "\n":
+        return 1
+    else:
+        return wcwidth.width(grapheme)
 
 def expand_tabs(s: str, tab_size: int) -> str:
     result: list[str] = []
@@ -22,7 +28,7 @@ def expand_tabs(s: str, tab_size: int) -> str:
             column += spaces
         else:
             result.append(grapheme)
-            column += wcwidth.width(grapheme)
+            column += get_width(grapheme)
 
     return "".join(result)
 
@@ -33,29 +39,29 @@ def wrap(s: str, width: int, tabsize: int) -> list[str]:
     column = 0
     s = expand_tabs(s, tabsize)
     for grapheme in wcwidth.iter_graphemes(s):
-        if column + wcwidth.width(grapheme) > width:
+        if column + get_width(grapheme) > width:
             result.append("".join(aux))
             aux = [grapheme]
-            column = wcwidth.width(grapheme)
+            column = get_width(grapheme)
         else:
             aux.append(grapheme)
-            column += wcwidth.width(grapheme)
+            column += get_width(grapheme)
     result.append("".join(aux))
     return result
 
 
 @dataclass
-class Cursor:
+class ScreenCursor:
     y: int = 0
     x: int = 0
 
     def __lt__(self, other: Self) -> bool:
         return (self.y, self.x) < (other.y, other.x)
 
-
+'''
 @dataclass
 class Insert:
-    cursor: Cursor
+    cursor: ScreenCursor
     text: list[str]
 
     def __post_init__(self) -> None:
@@ -65,8 +71,8 @@ class Insert:
 
 @dataclass
 class Delete:
-    from_: Cursor
-    to: Cursor
+    from_: ScreenCursor
+    to: ScreenCursor
 
 
 type Change = Insert | Delete
@@ -74,15 +80,15 @@ type Change = Insert | Delete
 
 def insert(text: list[str], cmd: Insert) -> list[str]:
     """
-    >>> insert(["hola", "que", "tal"], Insert(Cursor(1, 1), ["uu"]))
+    >>> insert(["hola", "que", "tal"], Insert(ScreenCursor(1, 1), ["uu"]))
     ['hola', 'quuue', 'tal']
-    >>> insert(["hola", "que", "tal"], Insert(Cursor(1, 1), ["hola", "que", "tal"]))
+    >>> insert(["hola", "que", "tal"], Insert(ScreenCursor(1, 1), ["hola", "que", "tal"]))
     ['hola', 'qhola', 'que', 'talue', 'tal']
-    >>> insert(["que", "tal"], Insert(Cursor(0, 0), ["hola", ""]))
+    >>> insert(["que", "tal"], Insert(ScreenCursor(0, 0), ["hola", ""]))
     ['hola', 'que', 'tal']
-    >>> insert(["hola", "que"], Insert(Cursor(1, 3), ["", "tal"]))
+    >>> insert(["hola", "que"], Insert(ScreenCursor(1, 3), ["", "tal"]))
     ['hola', 'que', 'tal']
-    >>> insert(["hola", "que", "tal"], Insert(Cursor(1, 1), ["", "", ""]))
+    >>> insert(["hola", "que", "tal"], Insert(ScreenCursor(1, 1), ["", "", ""]))
     ['hola', 'q', '', 'ue', 'tal']
     """
     cmd.text[0] = text[cmd.cursor.y][: cmd.cursor.x] + cmd.text[0]
@@ -93,27 +99,27 @@ def insert(text: list[str], cmd: Insert) -> list[str]:
 def delete(text: list[str], cmd: Delete) -> list[str]:
     """
     >>> text = ["Lorem ipsum", "dolor sit amet,", "consectetur adipiscing elit"]
-    >>> delete(text, Delete(Cursor(0, 0), Cursor(0, 0)))
+    >>> delete(text, Delete(ScreenCursor(0, 0), ScreenCursor(0, 0)))
     ['orem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(0, 6), Cursor(1, 5)))
+    >>> delete(text, Delete(ScreenCursor(0, 6), ScreenCursor(1, 5)))
     ['Lorem sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(0, 11), Cursor(1, 4)))
+    >>> delete(text, Delete(ScreenCursor(0, 11), ScreenCursor(1, 4)))
     ['Lorem ipsum sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(0, 11), Cursor(0, 11)))
+    >>> delete(text, Delete(ScreenCursor(0, 11), ScreenCursor(0, 11)))
     ['Lorem ipsumdolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(0, 11), Cursor(1, 15)))
+    >>> delete(text, Delete(ScreenCursor(0, 11), ScreenCursor(1, 15)))
     ['Lorem ipsumconsectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(0, 6), Cursor(0, 11)))
+    >>> delete(text, Delete(ScreenCursor(0, 6), ScreenCursor(0, 11)))
     ['Lorem dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(2, 27), Cursor(2, 27)))
+    >>> delete(text, Delete(ScreenCursor(2, 27), ScreenCursor(2, 27)))
     ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(2, 27), Cursor(2, 27)))
+    >>> delete(text, Delete(ScreenCursor(2, 27), ScreenCursor(2, 27)))
     ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(Cursor(2, 22), Cursor(2, 27)))
+    >>> delete(text, Delete(ScreenCursor(2, 22), ScreenCursor(2, 27)))
     ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing']
-    >>> delete(text, Delete(Cursor(0, 5), Cursor(2, 21)))
+    >>> delete(text, Delete(ScreenCursor(0, 5), ScreenCursor(2, 21)))
     ['Lorem elit']
-    >>> delete(text, Delete(Cursor(0, 0), Cursor(2, 27)))
+    >>> delete(text, Delete(ScreenCursor(0, 0), ScreenCursor(2, 27)))
     ['']
     """
     first = text[: cmd.from_.y]
@@ -139,12 +145,12 @@ def apply_change(text: list[str], cmd: Change) -> list[str]:  # type: ignore[ret
 
 
 # def inverse_insert(cmd: Insert) -> Delete:
-#     cursor_from = Cursor(cmd.cursor.y, cmd.cursor.x + 1)
-#     cursor_to: Cursor
+#     cursor_from = ScreenCursor(cmd.cursor.y, cmd.cursor.x + 1)
+#     cursor_to: ScreenCursor
 #     if len(cmd.text) == 1:
-#         cursor_to = Cursor(cmd.cursor.y, cmd.cursor.x + len(cmd.text[0]) + 1)
+#         cursor_to = ScreenCursor(cmd.cursor.y, cmd.cursor.x + len(cmd.text[0]) + 1)
 #     else:  # len(cmd.text) > 1
-#         cursor_to = Cursor(cmd.cursor.y + len(cmd.text) - 1, len(cmd.text[-1]) - 1)
+#         cursor_to = ScreenCursor(cmd.cursor.y + len(cmd.text) - 1, len(cmd.text[-1]) - 1)
 #     return Delete(cursor_from, cursor_to)
 
 
@@ -161,8 +167,8 @@ def inverse_insert(cmd: Insert) -> Delete:
         if x_to == -1:
             x_to = 0
             y_to -= 1
-    return Delete(Cursor(y_from, x_from), Cursor(y_to, x_to))
-
+    return Delete(ScreenCursor(y_from, x_from), ScreenCursor(y_to, x_to))
+'''
 
 """
 # TODO
@@ -185,7 +191,7 @@ class ViewPortSize(NamedTuple):
 class ViewPort:
     height: int
     width: int
-    cursor: Cursor
+    cursor: ScreenCursor
     lines: list[str]
     positions: list[BookMark]
 
@@ -201,10 +207,10 @@ class Vy:
     _print: PrintCallback
     _get_view_port_size: GetViewPortSizeCallback
 
-    file_path: Path | None = None
-    buffer: list[str] = field(default_factory=lambda: list(str()))
-    cursor: Cursor = field(default_factory=Cursor)
-    scroll_offset: int = 0
+    buffer: Text
+    cursor: TextCursor
+
+    scroll_offset: int = 0  # visible lines above the cursor
     x_goal: int = 0
     view_port: ViewPort | None = None
     quit: bool = False
@@ -223,48 +229,46 @@ class Vy:
         self._print = print_
         self._get_view_port_size = get_view_port_size
 
-        if file_path:
-            self.file_path = Path(file_path)
-            with open(self.file_path, "r") as f:
-                # lines = f.readlines() # this one adds '\n' to the end of each line
-                lines = f.read().splitlines()
-            self.buffer = lines
-        else:
-            self.file_path = None
-            self.buffer = [""]
+        self.buffer = Text(file_path)
+        self.cursor = self.buffer.get_cursor()
 
-        self.cursor = Cursor()
         self.scroll_offset = 0
         self.x_goal = 0
         self.view_port = None
         self.quit = False
 
     def cursor_down(self) -> None:
-        self.cursor.y = min(self.cursor.y + 1, len(self.buffer) - 1)
-        self.cursor.x = min(self.cursor.x, len(self.buffer[self.cursor.y]))
+        self.cursor.to_next_line()
+        self.cursor.to_column(self.x_goal, self.Config.TAB_SIZE)
+        self.scroll_offset += 1
 
     def cursor_up(self) -> None:
-        self.cursor.y = max(self.cursor.y - 1, 0)
-        self.cursor.x = min(self.cursor.x, len(self.buffer[self.cursor.y]))
+        self.cursor.to_prev_line()
+        self.cursor.to_column(self.x_goal, self.Config.TAB_SIZE)
+        if self.scroll_offset > 0:
+            self.scroll_offset -= 1
 
     def cursor_left(self) -> None:
-        if self.cursor.x == 0:
-            return
-        self.cursor.x = wcwidth.grapheme_boundary_before(
-            self.buffer[self.cursor.y], self.cursor.x
-        )
+        self.cursor.prev()
+        self.x_goal = self.cursor.get_column(self.Config.TAB_SIZE)
+        if self.cursor.is_eol() and self.scroll_offset > 0:
+            self.scroll_offset -= 1
 
     def cursor_right(self) -> None:
-        if self.cursor.x == len(self.buffer[self.cursor.y]):
+        if self.cursor.is_eof():
             return
-        increment = len(
-            next(wcwidth.iter_graphemes(self.buffer[self.cursor.y], self.cursor.x))
-        )
-        self.cursor.x += increment
 
+        if self.cursor.is_eol():
+            self.scroll_offset += 1
+
+        self.cursor.next()
+        self.x_goal = self.cursor.get_column(self.Config.TAB_SIZE)
+
+
+    '''
     def cursor_to_view_port(
-        self, c: Cursor, bookmarks: list[BookMark], width: int
-    ) -> Cursor | None:
+        self, c: ScreenCursor, bookmarks: list[BookMark], width: int
+    ) -> ScreenCursor | None:
         # if the cursor is not in the view port return None
         if c.y < bookmarks[0].line or c.y > bookmarks[-1].line:
             return None
@@ -284,17 +288,52 @@ class Vy:
 
         for i, b in enumerate(bookmarks):
             if line == b.line and subline == b.subline:
-                return Cursor(i, x)
+                return ScreenCursor(i, x)
 
         return None
+    '''
+    def cursor_to_view_port(
+        self, cursor: TextCursor, bookmarks: list[BookMark], lines: list[str]
+    ) -> ScreenCursor:
+        bol = cursor.clone()
+        bol.to_beginning_of_line()
+
+        line_idx = cursor.get_line_idx()
+
+        x = cursor.position - bol.position
+
+        for j, bookmark in enumerate(bookmarks):
+            if bookmark.line == line_idx:
+                if x > len(lines[j]):
+                    x -= len(lines[j])
+                else:
+                    return ScreenCursor(j, x) 
+        raise Exception("Cursor out of screen")
 
     def build_view_port(self) -> ViewPort:
         height, width = self._get_view_port_size()
 
+        self.scroll_offset = min(self.scroll_offset, height - 1)
+
         lines: list[str] = []
         positions: list[BookMark] = []
-        first_line = min(self.scroll_offset, self.cursor.y)
-        for i, line in enumerate(self.buffer[first_line:], first_line):
+
+
+        begin = self.cursor.clone()
+        begin.to_prev_line(self.scroll_offset)
+
+        end = begin.clone()
+        end.to_next_line(height)
+
+        text = self.buffer.get_range(begin, end)
+        if(end.get_line_idx() == self.buffer.line_count() - 1):
+            # insert eof character, cursor is allowed to sit there
+            text += " "
+        # keep line endings and replace them with whitespace
+        text = text.splitlines(keepends=True)
+        text = [line.replace("\n", " ") for line in text]
+
+        for i, line in enumerate(text, begin.get_line_idx()):
             # we append an space here so we can go past eol
             # on the screen every line has at least one space
             line += " "
@@ -303,16 +342,16 @@ class Vy:
             lines.extend(wrapped)
             positions.extend(wrapped_positions)
 
-            if len(lines) >= height and i >= self.cursor.y:
+            if len(lines) >= height and i >= self.cursor.get_line_idx():
                 break
 
         # adjust overfetch
         if len(lines) > height:
             lines_to_remove = len(lines) - height
             # distance from the cursor to the beginning of the fetched lines
-            distance0 = abs(positions[0].line - self.cursor.y)
+            distance0 = abs(positions[0].line - self.cursor.get_line_idx())
             # distance from the cursor to the end of the fetched lines
-            distance1 = abs(positions[-1].line - self.cursor.y)
+            distance1 = abs(positions[-1].line - self.cursor.get_line_idx())
 
             if distance1 < distance0:  # remove from the beginning
                 lines = lines[lines_to_remove:]
@@ -321,22 +360,10 @@ class Vy:
                 lines = lines[:-lines_to_remove]
                 positions = positions[:-lines_to_remove]
 
-        self.scroll_offset = positions[0].line
+        # self.scroll_offset = positions[0].line
+        self.scroll_offset = self.cursor.get_line_idx() - positions[0].line
 
-        # TODO: that's not gonna work when there are wrapped lines
-        # we have to compute y position better
-        # we have to compute x position better as well
-        # cursor = Cursor(self.cursor.y - self.scroll_offset, self.cursor.x)
-        cursor = self.cursor_to_view_port(self.cursor, positions, width)
-        if cursor is None:
-            raise Exception("Cursor out of the view port error")
-        if cursor.x >= width:
-            breakpoint()
-
-        # lines[-1] = f"(y: {self.cursor.y}, x: {self.cursor.x}) linelen: {
-        #     len(self.buffer[self.cursor.y])}"
-        # x = self.buffer[self.cursor.y][-1]
-        # assert x != '\n'
+        cursor = self.cursor_to_view_port(self.cursor, positions, lines)
 
         self.view_port = ViewPort(
             height=height, width=width, lines=lines, positions=positions, cursor=cursor
@@ -515,6 +542,7 @@ def main() -> None:
             read_key=read_key,
             get_view_port_size=get_view_port_size,
             print_=print_,
+            # file_path="foo.test",
             # file_path="main.py",
             file_path="sqlite3.c",
         ).run()

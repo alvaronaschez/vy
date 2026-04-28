@@ -70,7 +70,7 @@ class Text:
         for cursor in self.cursors:
             cursor.apply(command)
 
-    def delete(self, begin: Cursor, end: Cursor, closed_open: bool = False) -> None:
+    def delete(self, begin: Cursor, end: Cursor, closed_open: bool = True) -> None:
         """
         closed interval [begin, end]
         closed-open interval [begin, end)
@@ -115,11 +115,14 @@ class Text:
         self.cursors.add(c)
         return c
 
-    def get_lines(self, begin: int, end: int) -> list[str]:
-        return self.data.splitlines(keepends=True)[begin:end]
+    def get_lines(self, begin: Cursor, end: Cursor) -> list[str]:
+        return self.get_range(begin, end).splitlines(keepends=True)
 
     def line_count(self) -> int:
         return self.data.count("\n") + 1
+
+    def get_range(self, begin: Cursor, end: Cursor) -> str:
+        return self.data[begin.position: end.position]
 
 
 P = ParamSpec("P")
@@ -264,9 +267,9 @@ class Cursor:
     def to_end_of_line(self) -> None:
         self.position = self.text.data.find("\n", self.position)
         if self.position == -1:
-            self.position = len(self.text.data) - 1
+            # self.position = len(self.text.data) - 1
+            self.position = len(self.text.data)
 
-    @update_line
     def get_line_idx(self) -> int:
         """
         0-based index
@@ -274,6 +277,53 @@ class Cursor:
         # return len(self.text.data[: self.position + 1].splitlines()) - 1
         # return self.text.data[:self.position].count("\n")
         return self.line
+
+    def get_column(self, tab_size: int) -> int:
+        # TODO: use cache like with lines
+        start = self.text.data.rfind("\n", 0, self.position) + 1
+        end = self.position
+
+        column = 0
+
+        for grapheme in wcwidth.iter_graphemes(self.text.data, start, end):
+            if grapheme == "\t":
+                width = tab_size - column % tab_size
+            else:
+                width = max(0, wcwidth.width(grapheme))
+
+            column += width
+
+        return column
+
+
+
+    def to_column(self, n: int, tab_size: int) -> None:
+        """ Go to the nth column or to eol if n > eol"""
+        assert n >= 0
+
+        start = self.text.data.rfind("\n", 0, self.position) + 1
+        end = self.text.data.find("\n", self.position)
+        if end == -1:
+            end = len(self.text.data) - 1
+
+        self.position = start
+        column = 0
+
+        for grapheme in wcwidth.iter_graphemes(self.text.data, start, end):
+            if grapheme == "\t":
+                width = tab_size - column % tab_size
+            else:
+                width = max(0, wcwidth.width(grapheme))
+
+            column += width
+
+            if column > n:
+                return
+
+            self.position += len(grapheme)
+
+            if column == n:
+                return
 
     '''
     def get_line_column_idx(self) -> tuple[int, int]:
@@ -291,6 +341,12 @@ class Cursor:
             map(lambda l: len(l), self.text.data.splitlines(keepends=True)[:line])
         )
         self.line = line
+
+    def is_eol(self) -> bool:
+        return self.text.data[self.position] == "\n"
+
+    def is_eof(self) -> bool:
+        return self.position == len(self.text.data)
 
 
 @dataclass
