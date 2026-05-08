@@ -1,22 +1,26 @@
 # from __future__ import annotations  # python < 3.14
 
-import curses
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import partial
+import curses
 from typing import Any, Callable, NamedTuple, Self
 
 import wcwidth
 
+from text import Cursor as TextCursor
+from text import Text
+
 # import sys
 
-from text import Text, Cursor as TextCursor
+
 
 def get_width(grapheme: str) -> int:
     if grapheme == "\n":
         return 1
     else:
         return wcwidth.width(grapheme)
+
 
 def expand_tabs(s: str, tab_size: int) -> str:
     result: list[str] = []
@@ -57,124 +61,6 @@ class ScreenCursor:
 
     def __lt__(self, other: Self) -> bool:
         return (self.y, self.x) < (other.y, other.x)
-
-'''
-@dataclass
-class Insert:
-    cursor: ScreenCursor
-    text: list[str]
-
-    def __post_init__(self) -> None:
-        if self.text in [[], [""]]:
-            raise ValueError("Inserted text cannot be empty")
-
-
-@dataclass
-class Delete:
-    from_: ScreenCursor
-    to: ScreenCursor
-
-
-type Change = Insert | Delete
-
-
-def insert(text: list[str], cmd: Insert) -> list[str]:
-    """
-    >>> insert(["hola", "que", "tal"], Insert(ScreenCursor(1, 1), ["uu"]))
-    ['hola', 'quuue', 'tal']
-    >>> insert(["hola", "que", "tal"], Insert(ScreenCursor(1, 1), ["hola", "que", "tal"]))
-    ['hola', 'qhola', 'que', 'talue', 'tal']
-    >>> insert(["que", "tal"], Insert(ScreenCursor(0, 0), ["hola", ""]))
-    ['hola', 'que', 'tal']
-    >>> insert(["hola", "que"], Insert(ScreenCursor(1, 3), ["", "tal"]))
-    ['hola', 'que', 'tal']
-    >>> insert(["hola", "que", "tal"], Insert(ScreenCursor(1, 1), ["", "", ""]))
-    ['hola', 'q', '', 'ue', 'tal']
-    """
-    cmd.text[0] = text[cmd.cursor.y][: cmd.cursor.x] + cmd.text[0]
-    cmd.text[-1] = cmd.text[-1] + text[cmd.cursor.y][cmd.cursor.x :]
-    return text[: cmd.cursor.y] + cmd.text + text[cmd.cursor.y + 1 :]
-
-
-def delete(text: list[str], cmd: Delete) -> list[str]:
-    """
-    >>> text = ["Lorem ipsum", "dolor sit amet,", "consectetur adipiscing elit"]
-    >>> delete(text, Delete(ScreenCursor(0, 0), ScreenCursor(0, 0)))
-    ['orem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(0, 6), ScreenCursor(1, 5)))
-    ['Lorem sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(0, 11), ScreenCursor(1, 4)))
-    ['Lorem ipsum sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(0, 11), ScreenCursor(0, 11)))
-    ['Lorem ipsumdolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(0, 11), ScreenCursor(1, 15)))
-    ['Lorem ipsumconsectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(0, 6), ScreenCursor(0, 11)))
-    ['Lorem dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(2, 27), ScreenCursor(2, 27)))
-    ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(2, 27), ScreenCursor(2, 27)))
-    ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing elit']
-    >>> delete(text, Delete(ScreenCursor(2, 22), ScreenCursor(2, 27)))
-    ['Lorem ipsum', 'dolor sit amet,', 'consectetur adipiscing']
-    >>> delete(text, Delete(ScreenCursor(0, 5), ScreenCursor(2, 21)))
-    ['Lorem elit']
-    >>> delete(text, Delete(ScreenCursor(0, 0), ScreenCursor(2, 27)))
-    ['']
-    """
-    first = text[: cmd.from_.y]
-    mid = [text[cmd.from_.y][: cmd.from_.x] + text[cmd.to.y][cmd.to.x + 1 :]]
-    last = text[cmd.to.y + 1 :]
-
-    if cmd.to.x == len(text[cmd.to.y]) and cmd.to.y < len(text) - 1:
-        """
-        when the cursor 'to' is at the eol position (and it is not the last line of the
-        file) we join 'mid' and the first line of 'last' because we are deleting the eol
-        """
-        last[0] = mid[0] + last[0]
-        return first + last
-    else:
-        return first + mid + last
-
-
-def apply_change(text: list[str], cmd: Change) -> list[str]:  # type: ignore[return] # noqa: E501
-    if type(cmd) is Insert:
-        return insert(text, cmd)
-    if type(cmd) is Delete:
-        return delete(text, cmd)
-
-
-# def inverse_insert(cmd: Insert) -> Delete:
-#     cursor_from = ScreenCursor(cmd.cursor.y, cmd.cursor.x + 1)
-#     cursor_to: ScreenCursor
-#     if len(cmd.text) == 1:
-#         cursor_to = ScreenCursor(cmd.cursor.y, cmd.cursor.x + len(cmd.text[0]) + 1)
-#     else:  # len(cmd.text) > 1
-#         cursor_to = ScreenCursor(cmd.cursor.y + len(cmd.text) - 1, len(cmd.text[-1]) - 1)
-#     return Delete(cursor_from, cursor_to)
-
-
-# TODO: review and test
-def inverse_insert(cmd: Insert) -> Delete:
-    x_from = cmd.cursor.y
-    y_from = cmd.cursor.x + 1
-    y_to = cmd.cursor.y + len(cmd.text) - 1
-    x_to: int
-    if len(cmd.text) == 1:
-        x_to = cmd.cursor.x + len(cmd.text[0]) + 1
-    else:  # len(cmd.text) > 1
-        x_to = len(cmd.text[-1]) - 1
-        if x_to == -1:
-            x_to = 0
-            y_to -= 1
-    return Delete(ScreenCursor(y_from, x_from), ScreenCursor(y_to, x_to))
-'''
-
-"""
-# TODO
-def inverse_delete(cmd: Delete) -> Insert:
-    pass
-"""
 
 
 class BookMark(NamedTuple):
@@ -264,34 +150,6 @@ class Vy:
         self.cursor.next()
         self.x_goal = self.cursor.get_column(self.Config.TAB_SIZE)
 
-
-    '''
-    def cursor_to_view_port(
-        self, c: ScreenCursor, bookmarks: list[BookMark], width: int
-    ) -> ScreenCursor | None:
-        # if the cursor is not in the view port return None
-        if c.y < bookmarks[0].line or c.y > bookmarks[-1].line:
-            return None
-
-        if c.x == len(self.buffer[c.y]):
-            # we append an space here so we can go past eol
-            # on the screen every line has at least one space
-            to_wrap = self.buffer[c.y] + " "
-        else:  # c.x < len(self.buffer[c.y]
-            to_wrap = self.buffer[c.y][: c.x + 1]
-
-        wrapped = wrap(to_wrap, width, tabsize=self.Config.TAB_SIZE)
-        line, subline = c.y, len(wrapped) - 1
-        columns = wcwidth.width(wrapped[-1])
-        # columns > 0 as we always insert one space at the end of each line on the vp
-        x = columns - 1
-
-        for i, b in enumerate(bookmarks):
-            if line == b.line and subline == b.subline:
-                return ScreenCursor(i, x)
-
-        return None
-    '''
     def cursor_to_view_port(
         self, cursor: TextCursor, bookmarks: list[BookMark], lines: list[str]
     ) -> ScreenCursor:
@@ -307,7 +165,7 @@ class Vy:
                 if x > len(lines[j]):
                     x -= len(lines[j])
                 else:
-                    return ScreenCursor(j, x) 
+                    return ScreenCursor(j, x)
         raise Exception("Cursor out of screen")
 
     def build_view_port(self) -> ViewPort:
@@ -318,7 +176,6 @@ class Vy:
         lines: list[str] = []
         positions: list[BookMark] = []
 
-
         begin = self.cursor.clone()
         begin.to_prev_line(self.scroll_offset)
 
@@ -326,7 +183,7 @@ class Vy:
         end.to_next_line(height)
 
         text = self.buffer.get_range(begin, end)
-        if(end.get_line_idx() == self.buffer.line_count() - 1):
+        if end.get_line_idx() == self.buffer.line_count() - 1:
             # insert eof character, cursor is allowed to sit there
             text += " "
         # keep line endings and replace them with whitespace
