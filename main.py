@@ -1,9 +1,9 @@
 # from __future__ import annotations  # python < 3.14
 
+import curses
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import partial
-import curses
 from typing import Any, Callable, NamedTuple, Self
 
 import wcwidth
@@ -12,7 +12,6 @@ from text import Cursor as TextCursor
 from text import Text
 
 # import sys
-
 
 
 def get_width(grapheme: str) -> int:
@@ -182,7 +181,7 @@ class Vy:
         end = begin.clone()
         end.to_next_line(height)
 
-        text = self.buffer.get_range(begin, end)
+        text: Any = self.buffer.get_range(begin, end)
         if end.get_line_idx() == self.buffer.line_count() - 1:
             # insert eof character, cursor is allowed to sit there
             text += " "
@@ -400,8 +399,8 @@ def main() -> None:
             get_view_port_size=get_view_port_size,
             print_=print_,
             # file_path="foo.test",
-            # file_path="main.py",
-            file_path="sqlite3.c",
+            file_path="main.py",
+            # file_path="sqlite3.c",
         ).run()
 
 

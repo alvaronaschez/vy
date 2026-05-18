@@ -12,4 +12,4 @@ mypy:
 cloc:
 	cloc main.py
 doctest:
-	python -m doctest main.py
+	python -m doctest vy.py
