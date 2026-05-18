@@ -515,7 +515,8 @@ def main() -> None:
             read_key=read_key,
             get_view_port_size=get_view_port_size,
             print_=print_,
-            file_path="main.py",
+            # file_path="main.py",
+            file_path="sqlite3.c",
         ).run()
 
 
