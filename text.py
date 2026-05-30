@@ -122,7 +122,7 @@ class Text:
         return self.data.count("\n") + 1
 
     def get_range(self, begin: Cursor, end: Cursor) -> str:
-        return self.data[begin.position: end.position]
+        return self.data[begin.position : end.position]
 
 
 P = ParamSpec("P")
@@ -295,10 +295,8 @@ class Cursor:
 
         return column
 
-
-
     def to_column(self, n: int, tab_size: int) -> None:
-        """ Go to the nth column or to eol if n > eol"""
+        """Go to the nth column or to eol if n > eol"""
         assert n >= 0
 
         start = self.text.data.rfind("\n", 0, self.position) + 1

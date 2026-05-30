@@ -1,16 +1,17 @@
 # from __future__ import annotations  # python < 3.14
 
+import curses
 from dataclasses import dataclass, field
 from enum import StrEnum
-from pathlib import Path
-from typing import Callable, Self, NamedTuple, Any
 from functools import partial
-import curses
+from pathlib import Path
+from typing import Any, Callable, NamedTuple, Self
+
+import wcwidth
+
 # from copy import deepcopy
 
 # import sys
-
-import wcwidth
 
 
 def expand_tabs(s: str, tab_size: int) -> str:
@@ -183,12 +184,12 @@ def inverse_delete(cmd: Delete, txt: list[str]) -> Insert:
     x = cmd.from_.x
     text: list[str]
     if cmd.from_.y == cmd.to.y:
-        text = [txt[cmd.from_.y][cmd.from_.x: cmd.to.x + 1]]
+        text = [txt[cmd.from_.y][cmd.from_.x : cmd.to.x + 1]]
     else:
         # text = deepcopy(txt[cmd.from_.y : cmd.to.y + 1])
         text = txt[cmd.from_.y : cmd.to.y + 1]
-        text[0] = text[0][cmd.from_.x:]
-        text[-1] = text[-1][:cmd.to.x + 1]
+        text[0] = text[0][cmd.from_.x :]
+        text[-1] = text[-1][: cmd.to.x + 1]
     return Insert(Cursor(y, x), text)
 
 
