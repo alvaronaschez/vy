@@ -55,7 +55,7 @@ class Cursor:
 
 
 @dataclass
-class Insert():
+class Insert:
     cursor: Cursor
     text: list[str]
 
@@ -65,7 +65,7 @@ class Insert():
 
 
 @dataclass
-class Delete():
+class Delete:
     from_: Cursor
     to: Cursor
 
@@ -151,12 +151,18 @@ def apply_change(text: list[str], cmd: Change) -> list[str]:  # type: ignore[ret
 
 # TODO: review and test
 def inverse_insert(cmd: Insert) -> Delete:
+    """
+    >>> inverse_insert(Insert(Cursor(0, 0), ["hello"]))
+    Delete(from_=Cursor(y=0, x=0), to=Cursor(y=0, x=4))
+    >>> inverse_insert(Insert(Cursor(5, 5), ["hello", "world"]))
+    Delete(from_=Cursor(y=5, x=5), to=Cursor(y=6, x=4))
+    """
     y_from = cmd.cursor.y
     x_from = cmd.cursor.x
     y_to = cmd.cursor.y + len(cmd.text) - 1
     x_to: int
     if len(cmd.text) == 1:
-        x_to = cmd.cursor.x + len(cmd.text[0])
+        x_to = cmd.cursor.x + len(cmd.text[0]) - 1
     else:  # len(cmd.text) > 1
         x_to = len(cmd.text[-1]) - 1
         if x_to == -1:
@@ -167,11 +173,17 @@ def inverse_insert(cmd: Insert) -> Delete:
 
 # TODO: review and test
 def inverse_delete(cmd: Delete, txt: list[str]) -> Insert:
-    x = cmd.from_.y
-    y = cmd.from_.x
+    """
+    >>> inverse_delete(Delete(Cursor(0,2), Cursor(1,2)), ["hello", "world"])
+    Insert(cursor=Cursor(y=0, x=2), text=['llo', 'wor'])
+    >>> inverse_delete(Delete(Cursor(1,2), Cursor(1,2)), ["hello", "world"])
+    Insert(cursor=Cursor(y=1, x=2), text=['r'])
+    """
+    y = cmd.from_.y
+    x = cmd.from_.x
     text: list[str]
     if cmd.from_.y == cmd.to.y:
-        text = [txt[cmd.from_.y][cmd.from_.x: cmd.to.x]]
+        text = [txt[cmd.from_.y][cmd.from_.x: cmd.to.x + 1]]
     else:
         # text = deepcopy(txt[cmd.from_.y : cmd.to.y + 1])
         text = txt[cmd.from_.y : cmd.to.y + 1]
