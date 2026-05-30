@@ -140,16 +140,6 @@ def apply_change(text: list[str], cmd: Change) -> list[str]:  # type: ignore[ret
         return delete(text, cmd)
 
 
-# def inverse_insert(cmd: Insert) -> Delete:
-#     cursor_from = Cursor(cmd.cursor.y, cmd.cursor.x + 1)
-#     cursor_to: Cursor
-#     if len(cmd.text) == 1:
-#         cursor_to = Cursor(cmd.cursor.y, cmd.cursor.x + len(cmd.text[0]) + 1)
-#     else:  # len(cmd.text) > 1
-#         cursor_to = Cursor(cmd.cursor.y + len(cmd.text) - 1, len(cmd.text[-1]) - 1)
-#     return Delete(cursor_from, cursor_to)
-
-
 def inverse_insert(cmd: Insert) -> Delete:
     """
     >>> inverse_insert(Insert(Cursor(0, 0), ["hello"]))
@@ -256,7 +246,7 @@ class Vy:
         self.cursor = Cursor()
         self.scroll_offset = 0
         self.x_goal = 0
-        self.view_port = None
+        # self.view_port = None
         self.quit = False
 
     def cursor_down(self) -> None:
@@ -358,15 +348,14 @@ class Vy:
         # x = self.buffer[self.cursor.y][-1]
         # assert x != '\n'
 
-        self.view_port = ViewPort(
+        return ViewPort(
             height=height, width=width, lines=lines, positions=positions, cursor=cursor
         )
 
-        return self.view_port
 
     def print(self) -> None:
-        self.view_port = self.build_view_port()
-        self._print(self.view_port)
+        view_port = self.build_view_port()
+        self._print(view_port)
 
     def read_key(self) -> None:
         k = self._read_key()
