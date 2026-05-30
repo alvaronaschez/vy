@@ -150,7 +150,6 @@ def apply_change(text: list[str], cmd: Change) -> list[str]:  # type: ignore[ret
 #     return Delete(cursor_from, cursor_to)
 
 
-# TODO: review and test
 def inverse_insert(cmd: Insert) -> Delete:
     """
     >>> inverse_insert(Insert(Cursor(0, 0), ["hello"]))
@@ -172,7 +171,6 @@ def inverse_insert(cmd: Insert) -> Delete:
     return Delete(Cursor(y_from, x_from), Cursor(y_to, x_to))
 
 
-# TODO: review and test
 def inverse_delete(cmd: Delete, txt: list[str]) -> Insert:
     """
     >>> inverse_delete(Delete(Cursor(0,2), Cursor(1,2)), ["hello", "world"])
