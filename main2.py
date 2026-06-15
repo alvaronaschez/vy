@@ -180,6 +180,13 @@ def inverse_delete(cmd: Delete, txt: list[str]) -> Insert:
         text[-1] = text[-1][: cmd.to.x + 1]
     return Insert(Cursor(y, x), text)
 
+def inverse_change(cmd: Change, txt: list[str]) -> Change:
+    if type(cmd) == Insert:
+        return inverse_insert(cmd)
+    if type(cmd) == Delete:
+        return inverse_delete(cmd, txt)
+    raise Exception("unreachable")
+
 
 class BookMark(NamedTuple):
     line: int
