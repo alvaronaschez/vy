@@ -54,6 +54,16 @@ class Cursor:
     def __lt__(self, other: Self) -> bool:
         return (self.y, self.x) < (other.y, other.x)
 
+    def update(self, cmd: Change):
+        if type(cmd) == Insert:
+            if self.y > cmd.cursor.y:
+                self.y += len(cmd.text) - 1
+            if self.y == cmd.cursor.y and self.x >= cmd.cursor.x:
+                self.x += len(cmd.text[0])
+        elif type(cmd) == Delete:
+            pass
+        raise Exception("unreachable")
+
 
 @dataclass
 class Insert:
@@ -180,12 +190,61 @@ def inverse_delete(cmd: Delete, txt: list[str]) -> Insert:
         text[-1] = text[-1][: cmd.to.x + 1]
     return Insert(Cursor(y, x), text)
 
-def inverse_change(cmd: Change, txt: list[str]) -> Change:
+
+def inverse_command(cmd: Change, txt: list[str]) -> Change:
     if type(cmd) == Insert:
         return inverse_insert(cmd)
     if type(cmd) == Delete:
         return inverse_delete(cmd, txt)
     raise Exception("unreachable")
+
+
+class Text:
+    def __init__(self, file_path: str|None = None):
+        if file_path:
+            self.file_path = Path(file_path)
+            with open(self.file_path, "r") as f:
+                lines = f.read().split("\n")
+            self.buffer = lines
+        else:
+            self.file_path = None
+            self.buffer = [""]
+        self.undo_stack: list[Change] = []
+        self.redo_stack: list[Change] = []
+
+    def insert(self, cursor: Cursor, txt: str):
+        txt: list[str] = txt.split("\n")
+        cmd = Insert(cursor, txt)
+        change = inverse_insert(cmd)
+        self.buffer = insert(self.buffer, cmd)
+        self.undo_stack.append(change)
+        self.redo_stack.clear()
+
+    def delete(self, cursor_from: Cursor, cursor_to: Cursor):
+        cmd = Delete(cursor_from, cursor_to)
+        change = inverse_delete(cmd, self.buffer)
+        self.buffer = delete(self.buffer, cmd)
+        self.undo_stack.append(change)
+        self.redo_stack.clear()
+
+    def undo(self):
+        cmd = self.undo_stack.pop()
+        change = inverse_command(cmd, self.buffer)
+        self.buffer = apply_change(self.buffer, cmd)
+        self.redo_stack.append(change)
+        
+    def redo(self):
+        cmd = self.redo_stack.pop()
+        change = inverse_command(cmd, self.buffer)
+        self.buffer = apply_change(self.buffer, cmd)
+        self.undo_stack.append(change)
+
+    def get_line(self, row: int) -> str:
+        return  self.buffer[row]
+
+    def get_cursor(self, row: int, col: int) -> Cursor:
+        # TODO: register the cursor
+        return Cursor(row, col)
 
 
 class BookMark(NamedTuple):
