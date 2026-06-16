@@ -1,15 +1,15 @@
 run:
-	python main2.py
+	python main.py
 activate:
 	. .venv/bin/activate
 debug:
 	python -m pdb -p $(pgrep python)
 format:
-	isort main2.py text.py
-	black main2.py text.py
+	isort main.py text.py
+	black main.py text.py
 mypy:
-	mypy --strict main2.py
+	mypy --strict main.py
 cloc:
-	cloc main2.py
+	cloc main.py text.py
 doctest:
 	python -m doctest main2.py

@@ -38,7 +38,7 @@ def expand_tabs(s: str, tab_size: int) -> str:
 
 def cut_line(s: str, tab_size: int, offset: int, width: int) -> str:
     result: str = expand_tabs(s, tab_size)
-    #result = wcwidth.clip(result, offset, offset + width, control_codes='ignore')
+    # result = wcwidth.clip(result, offset, offset + width, control_codes='ignore')
     result = wcwidth.clip(result, offset, offset + width)
     return result
 
@@ -85,7 +85,7 @@ class ViewPort:
     width: int
     cursor: ScreenCursor
     lines: list[str]
-    #positions: list[BookMark]
+    # positions: list[BookMark]
 
 
 type ReadKeyCallback = Callable[[], Key | str]
@@ -103,8 +103,8 @@ class Vy:
     cursor: TextCursor
 
     scroll_offset: int = 0  # visible lines above the cursor
-    y_off: int = 0 # first line to print
-    x_off: int = 0 # first column to print
+    y_off: int = 0  # first line to print
+    x_off: int = 0  # first column to print
     x_goal: int = 0
     view_port: ViewPort | None = None
     quit: bool = False
@@ -163,7 +163,7 @@ class Vy:
     def build_view_port(self) -> ViewPort:
         height, width = self._get_view_port_size()
 
-        #self.scroll_offset = min(self.scroll_offset, height - 1)
+        # self.scroll_offset = min(self.scroll_offset, height - 1)
         cursor_line_idx = self.cursor.get_line_idx()
         if self.y_off > cursor_line_idx:
             self.y_off = cursor_line_idx
@@ -191,18 +191,17 @@ class Vy:
         # text: list[str]
         text = text.splitlines(keepends=True)
         text = [line.replace("\n", " ") for line in text]
-        #cursor_line = text[cursor_line_idx - self.y_off]
-        text = [cut_line(line, self.Config.TAB_SIZE, self.x_off, width)
-                for line in text]
-        #cursor = self.cursor_to_view_port(self.cursor, positions, lines)
-        
+        # cursor_line = text[cursor_line_idx - self.y_off]
+        text = [
+            cut_line(line, self.Config.TAB_SIZE, self.x_off, width) for line in text
+        ]
+        # cursor = self.cursor_to_view_port(self.cursor, positions, lines)
+
         cursor_y = cursor_line_idx - self.y_off
         cursor_x = self.cursor.get_column(tab_size=self.Config.TAB_SIZE) - self.x_off
         cursor = ScreenCursor(cursor_y, cursor_x)
 
-        self.view_port = ViewPort(
-            height=height, width=width, lines=text, cursor=cursor
-        )
+        self.view_port = ViewPort(height=height, width=width, lines=text, cursor=cursor)
 
         return self.view_port
 
