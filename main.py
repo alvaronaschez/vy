@@ -36,6 +36,13 @@ def expand_tabs(s: str, tab_size: int) -> str:
     return "".join(result)
 
 
+def cut_line(s: str, tab_size: int, offset: int, width: int) -> str:
+    result: str = expand_tabs(s, tab_size)
+    #result = wcwidth.clip(result, offset, offset + width, control_codes='ignore')
+    result = wcwidth.clip(result, offset, offset + width)
+    return result
+
+
 def wrap(s: str, width: int, tabsize: int) -> list[str]:
     result: list[str] = []
     aux: list[str] = []
@@ -78,7 +85,7 @@ class ViewPort:
     width: int
     cursor: ScreenCursor
     lines: list[str]
-    positions: list[BookMark]
+    #positions: list[BookMark]
 
 
 type ReadKeyCallback = Callable[[], Key | str]
@@ -96,6 +103,8 @@ class Vy:
     cursor: TextCursor
 
     scroll_offset: int = 0  # visible lines above the cursor
+    y_off: int = 0 # first line to print
+    x_off: int = 0 # first column to print
     x_goal: int = 0
     view_port: ViewPort | None = None
     quit: bool = False
@@ -118,6 +127,8 @@ class Vy:
         self.cursor = self.buffer.get_cursor()
 
         self.scroll_offset = 0
+        self.y_off = 0
+        self.x_off = 0
         self.x_goal = 0
         self.view_port = None
         self.quit = False
@@ -149,80 +160,48 @@ class Vy:
         self.cursor.next()
         self.x_goal = self.cursor.get_column(self.Config.TAB_SIZE)
 
-    def cursor_to_view_port(
-        self, cursor: TextCursor, bookmarks: list[BookMark], lines: list[str]
-    ) -> ScreenCursor:
-        bol = cursor.clone()
-        bol.to_beginning_of_line()
-
-        line_idx = cursor.get_line_idx()
-
-        x = cursor.position - bol.position
-
-        for j, bookmark in enumerate(bookmarks):
-            if bookmark.line == line_idx:
-                if x > len(lines[j]):
-                    x -= len(lines[j])
-                else:
-                    return ScreenCursor(j, x)
-        raise Exception("Cursor out of screen")
-
     def build_view_port(self) -> ViewPort:
         height, width = self._get_view_port_size()
 
-        self.scroll_offset = min(self.scroll_offset, height - 1)
+        #self.scroll_offset = min(self.scroll_offset, height - 1)
+        cursor_line_idx = self.cursor.get_line_idx()
+        if self.y_off > cursor_line_idx:
+            self.y_off = cursor_line_idx
+        if cursor_line_idx >= self.y_off + height:
+            self.y_off = cursor_line_idx - height + 1
 
-        lines: list[str] = []
-        positions: list[BookMark] = []
+        cursor_column = self.cursor.get_column(tab_size=self.Config.TAB_SIZE)
+        if cursor_column < self.x_off:
+            self.x_off = cursor_column
+        elif cursor_column - self.x_off >= width:
+            self.x_off = cursor_column - width + 1
 
         begin = self.cursor.clone()
-        begin.to_prev_line(self.scroll_offset)
+        begin.to_prev_line(cursor_line_idx - self.y_off)
 
         end = begin.clone()
         end.to_next_line(height)
 
+        # text: str
         text: Any = self.buffer.get_range(begin, end)
         if end.get_line_idx() == self.buffer.line_count() - 1:
             # insert eof character, cursor is allowed to sit there
             text += " "
         # keep line endings and replace them with whitespace
+        # text: list[str]
         text = text.splitlines(keepends=True)
         text = [line.replace("\n", " ") for line in text]
-
-        for i, line in enumerate(text, begin.get_line_idx()):
-            # we append an space here so we can go past eol
-            # on the screen every line has at least one space
-            line += " "
-            wrapped = wrap(line, width, tabsize=self.Config.TAB_SIZE)
-            wrapped_positions = [BookMark(i, j) for j in range(len(wrapped))]
-            lines.extend(wrapped)
-            positions.extend(wrapped_positions)
-
-            if len(lines) >= height and i >= self.cursor.get_line_idx():
-                break
-
-        # adjust overfetch
-        if len(lines) > height:
-            lines_to_remove = len(lines) - height
-            # distance from the cursor to the beginning of the fetched lines
-            distance0 = abs(positions[0].line - self.cursor.get_line_idx())
-            # distance from the cursor to the end of the fetched lines
-            distance1 = abs(positions[-1].line - self.cursor.get_line_idx())
-
-            if distance1 < distance0:  # remove from the beginning
-                lines = lines[lines_to_remove:]
-                positions = positions[lines_to_remove:]
-            else:  # remove from the end
-                lines = lines[:-lines_to_remove]
-                positions = positions[:-lines_to_remove]
-
-        # self.scroll_offset = positions[0].line
-        self.scroll_offset = self.cursor.get_line_idx() - positions[0].line
-
-        cursor = self.cursor_to_view_port(self.cursor, positions, lines)
+        #cursor_line = text[cursor_line_idx - self.y_off]
+        text = [cut_line(line, self.Config.TAB_SIZE, self.x_off, width)
+                for line in text]
+        #cursor = self.cursor_to_view_port(self.cursor, positions, lines)
+        
+        cursor_y = cursor_line_idx - self.y_off
+        cursor_x = self.cursor.get_column(tab_size=self.Config.TAB_SIZE) - self.x_off
+        cursor = ScreenCursor(cursor_y, cursor_x)
 
         self.view_port = ViewPort(
-            height=height, width=width, lines=lines, positions=positions, cursor=cursor
+            height=height, width=width, lines=text, cursor=cursor
         )
 
         return self.view_port
@@ -399,8 +378,8 @@ def main() -> None:
             get_view_port_size=get_view_port_size,
             print_=print_,
             # file_path="foo.test",
-            file_path="main.py",
-            # file_path="sqlite3.c",
+            # file_path="main.py",
+            file_path="sqlite3.c",
         ).run()
 
 
