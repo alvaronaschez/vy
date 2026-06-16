@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass, field
 from functools import wraps
 from os.path import expanduser, expandvars, realpath
-from typing import Callable, Concatenate, ParamSpec, Self, TypeVar
+from typing import Callable, Concatenate, ParamSpec, Self, TypeVar, cast
 from weakref import WeakSet
 
 import wcwidth
@@ -178,7 +178,9 @@ class Cursor:
 
             return result
 
-        return wrapper
+        # return wrapper
+        # avoid mypy error
+        return cast(Callable[Concatenate["Cursor", P], R], wrapper)
 
     @update_line
     def apply(self, command: Delete | Insert) -> None:

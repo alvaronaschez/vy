@@ -1,2 +1,7 @@
-wcwidth==0.6.0
-more-itertools==11.0.1
+#wcwidth==0.6.0
+#more-itertools==11.0.1
+
+wcwidth>=0.8.1
+
+# dev
+mypy>=2.1.0

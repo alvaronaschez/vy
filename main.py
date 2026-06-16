@@ -1,7 +1,7 @@
 # from __future__ import annotations  # python < 3.14
 
 import curses
-from dataclasses import dataclass
+from dataclasses import dataclass, field, InitVar
 from enum import StrEnum
 from functools import partial
 from typing import Any, Callable, NamedTuple, Self
@@ -95,14 +95,18 @@ type GetViewPortSizeCallback = Callable[[], ViewPortSize]  # (height, width)
 
 @dataclass(slots=True)
 class Vy:
-    _read_key: ReadKeyCallback
-    _print: PrintCallback
-    _get_view_port_size: GetViewPortSizeCallback
+    read_key: InitVar[ReadKeyCallback]
+    print_: InitVar[PrintCallback]
+    get_view_port_size: InitVar[GetViewPortSizeCallback]
+    file_path: InitVar[str | None] = None
 
-    buffer: Text
-    cursor: TextCursor
+    _read_key: ReadKeyCallback = field(init=False)
+    _print: PrintCallback = field(init=False)
+    _get_view_port_size: GetViewPortSizeCallback = field(init=False)
 
-    scroll_offset: int = 0  # visible lines above the cursor
+    buffer: Text = field(init=False)
+    cursor: TextCursor = field(init=False)
+
     y_off: int = 0  # first line to print
     x_off: int = 0  # first column to print
     x_goal: int = 0
@@ -112,11 +116,11 @@ class Vy:
     class Config:
         TAB_SIZE = 8
 
-    def __init__(
+    def __post_init__(
         self: Self,
         read_key: ReadKeyCallback,
-        get_view_port_size: GetViewPortSizeCallback,
         print_: PrintCallback,
+        get_view_port_size: GetViewPortSizeCallback,
         file_path: str | None = None,
     ) -> None:
         self._read_key = read_key
@@ -126,36 +130,21 @@ class Vy:
         self.buffer = Text(file_path)
         self.cursor = self.buffer.get_cursor()
 
-        self.scroll_offset = 0
-        self.y_off = 0
-        self.x_off = 0
-        self.x_goal = 0
-        self.view_port = None
-        self.quit = False
-
     def cursor_down(self) -> None:
         self.cursor.to_next_line()
         self.cursor.to_column(self.x_goal, self.Config.TAB_SIZE)
-        self.scroll_offset += 1
 
     def cursor_up(self) -> None:
         self.cursor.to_prev_line()
         self.cursor.to_column(self.x_goal, self.Config.TAB_SIZE)
-        if self.scroll_offset > 0:
-            self.scroll_offset -= 1
 
     def cursor_left(self) -> None:
         self.cursor.prev()
         self.x_goal = self.cursor.get_column(self.Config.TAB_SIZE)
-        if self.cursor.is_eol() and self.scroll_offset > 0:
-            self.scroll_offset -= 1
 
     def cursor_right(self) -> None:
         if self.cursor.is_eof():
             return
-
-        if self.cursor.is_eol():
-            self.scroll_offset += 1
 
         self.cursor.next()
         self.x_goal = self.cursor.get_column(self.Config.TAB_SIZE)
@@ -163,7 +152,6 @@ class Vy:
     def build_view_port(self) -> ViewPort:
         height, width = self._get_view_port_size()
 
-        # self.scroll_offset = min(self.scroll_offset, height - 1)
         cursor_line_idx = self.cursor.get_line_idx()
         if self.y_off > cursor_line_idx:
             self.y_off = cursor_line_idx
@@ -209,7 +197,7 @@ class Vy:
         self.view_port = self.build_view_port()
         self._print(self.view_port)
 
-    def read_key(self) -> None:
+    def read_key_(self) -> None:
         k = self._read_key()
 
         match k:
@@ -231,7 +219,7 @@ class Vy:
     def run(self) -> None:
         while not self.quit:
             self.print()
-            self.read_key()
+            self.read_key_()
 
 
 class CursesContextManager:

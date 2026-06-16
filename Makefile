@@ -8,7 +8,7 @@ format:
 	isort main.py text.py
 	black main.py text.py
 mypy:
-	mypy --strict main.py
+	mypy --strict main.py text.py
 cloc:
 	cloc main.py text.py
 doctest:
