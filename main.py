@@ -1,8 +1,8 @@
 # from __future__ import annotations  # python < 3.14
 
 import curses
-from dataclasses import InitVar, dataclass, field
-from enum import Enum, StrEnum
+from dataclasses import dataclass
+from enum import Enum, StrEnum, auto
 from functools import partial
 from typing import Any, Callable, NamedTuple, Self
 
@@ -92,37 +92,30 @@ type PrintCallback = Callable[[ViewPort], None]
 type GetViewPortSizeCallback = Callable[[], ViewPortSize]  # (height, width)
 
 
-@dataclass(slots=True)
 class Vy:
-    read_key: InitVar[ReadKeyCallback]
-    print_: InitVar[PrintCallback]
-    get_view_port_size: InitVar[GetViewPortSizeCallback]
-    file_path: InitVar[str | None] = None
+    __slots__ = (
+        "_read_key",
+        "_print",
+        "_get_view_port_size",
+        "buffer",
+        "cursor",
+        "y_off",
+        "x_off",
+        "x_goal",
+        "view_port",
+        "mode",
+        "insert_buffer",
+        "quit",
+    )
 
-    _read_key: ReadKeyCallback = field(init=False)
-    _print: PrintCallback = field(init=False)
-    _get_view_port_size: GetViewPortSizeCallback = field(init=False)
-
-    buffer: Text = field(init=False)
-    cursor: TextCursor = field(init=False)
-
-    y_off: int = 0  # first line to print
-    x_off: int = 0  # first column to print
-    x_goal: int = 0
-    view_port: ViewPort | None = None
-
-    insert_buffer: str = ""
-
-    quit: bool = False
-
-    Mode = Enum("Mode", ["NORMAL", "INSERT"])
-
-    mode: Mode = Mode.NORMAL
+    class Mode(Enum):
+        NORMAL = auto()
+        INSERT = auto()
 
     class Config:
         TAB_SIZE = 8
 
-    def __post_init__(
+    def __init__(
         self: Self,
         read_key: ReadKeyCallback,
         print_: PrintCallback,
@@ -133,8 +126,17 @@ class Vy:
         self._print = print_
         self._get_view_port_size = get_view_port_size
 
-        self.buffer = Text(file_path)
-        self.cursor = self.buffer.get_cursor()
+        self.buffer: Text = Text(file_path)
+        self.cursor: TextCursor = self.buffer.get_cursor()
+
+        self.y_off: int = 0  # first line to print
+        self.x_off: int = 0  # first column to print
+        self.x_goal: int = 0
+        self.view_port: ViewPort | None = None
+
+        self.mode: Vy.Mode = self.Mode.NORMAL
+        self.insert_buffer: str = ""
+        self.quit: bool = False
 
     def cursor_down(self) -> None:
         self.cursor.to_next_line()

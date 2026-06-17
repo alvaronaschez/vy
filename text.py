@@ -1,5 +1,5 @@
 from copy import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import wraps
 from os.path import expanduser, expandvars, realpath
 from typing import Callable, Concatenate, ParamSpec, Self, TypeVar, cast
@@ -7,22 +7,21 @@ from typing import Callable, Concatenate, ParamSpec, Self, TypeVar, cast
 import wcwidth
 
 
-@dataclass(slots=True)
 class Text:
     # TODO: poll file updates
     # ask if reload when changed from outside
     # os.stat(filename).st_mtime? watchdog?
-    file_path: str | None = None
-    data: str = field(init=False)
-    undo_stack: list[Delete | Insert] = field(init=False, default_factory=lambda: [])
-    redo_stack: list[Delete | Insert] = field(init=False, default_factory=lambda: [])
 
-    def __post_init__(self) -> None:
-        if not self.file_path:
-            self.file_path = None
-            self.data = ""
-        else:
-            self.file_path = realpath(expandvars(expanduser(self.file_path)))
+    __slots__ = ("file_path", "data", "undo_stack", "redo_stack")
+
+    def __init__(self, file_path: str | None = None) -> None:
+        self.file_path: str | None = None
+        self.data: str = ""
+        self.undo_stack: list[Delete | Insert] = []
+        self.redo_stack: list[Delete | Insert] = []
+
+        if file_path:
+            self.file_path = realpath(expandvars(expanduser(file_path)))
             try:
                 with open(self.file_path, "r", encoding="utf-8") as f:
                     self.data = f.read()
@@ -143,7 +142,6 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-@dataclass(eq=False)
 class Cursor:
     """
     Represents a position within a Text object that stays consistent
@@ -165,9 +163,12 @@ class Cursor:
         - 0 <= position <= len(text)
     """
 
-    text: Text  # back reference
-    position: int = 0
-    line: int = 0
+    __slots__ = ("text", "position", "line")
+
+    def __init__(self, text: Text, position: int = 0, line: int = 0):
+        self.text = text
+        self.position = position
+        self.line = line
 
     @staticmethod
     def update_line(

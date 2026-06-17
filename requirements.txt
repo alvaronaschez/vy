@@ -7,3 +7,5 @@ wcwidth>=0.8.1
 mypy>=2.1.0
 black
 isort
+python-lsp-server[all]
+pylsp-mypy

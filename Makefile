@@ -9,6 +9,7 @@ format:
 	black main.py text.py
 mypy:
 	mypy --strict main.py text.py
+lint: format mypy
 cloc:
 	cloc main.py text.py
 doctest:
