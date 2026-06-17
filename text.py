@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from functools import wraps
 from os.path import expanduser, expandvars, realpath
 from typing import Callable, Concatenate, ParamSpec, Self, TypeVar, cast
-from weakref import WeakSet
 
 import wcwidth
 
@@ -17,9 +16,6 @@ class Text:
     data: str = field(init=False)
     undo_stack: list[Delete | Insert] = field(init=False, default_factory=lambda: [])
     redo_stack: list[Delete | Insert] = field(init=False, default_factory=lambda: [])
-    cursors: WeakSet[Cursor] = field(
-        default_factory=lambda: WeakSet()
-    )  # subscribers (observer pattern)
 
     def __post_init__(self) -> None:
         if not self.file_path:
@@ -62,13 +58,12 @@ class Text:
         self.data = self.data[:position] + text + self.data[position:]
 
     def _apply(self, command: Delete | Insert) -> None:
+        # TODO: move cursor
         match command:
             case Delete(begin, count):
                 self._delete(begin, count)
             case Insert(position, text):
                 self._insert(position, text)
-        for cursor in self.cursors:
-            cursor.apply(command)
 
     def delete(self, begin: Cursor, end: Cursor, closed_open: bool = True) -> None:
         """
@@ -80,11 +75,12 @@ class Text:
             end.next()
         count = end.position - begin.position
         self._delete(begin.position, count)
-        # self._apply(Delete(begin.position, count))
 
-    def insert(self, position: Cursor, text: str) -> None:
-        self._insert(position.position, text)
-        # self._apply(Insert(position.position, text))
+    def insert(self, cursor: Cursor, text: str) -> None:
+        if text:
+            self._insert(cursor.position, text)
+            # cursor.to_position(cursor.position+len(text)-1)
+            cursor.to_position(cursor.position+len(text))
 
     def undo(self) -> None:
         if not self.undo_stack:
@@ -113,7 +109,6 @@ class Text:
         Get a new cursor and subscribe it to events sent from this Text
         """
         c = Cursor(self)
-        self.cursors.add(c)
         return c
 
     def get_lines(self, begin: Cursor, end: Cursor) -> list[str]:
@@ -218,7 +213,6 @@ class Cursor:
 
     def clone(self) -> Cursor:
         new = copy(self)
-        self.text.cursors.add(new)
         return new
 
     @update_line
@@ -237,6 +231,11 @@ class Cursor:
                 return
             increment = len(next(wcwidth.iter_graphemes(self.text.data, self.position)))
             self.position += increment
+
+    @update_line
+    def to_position(self, position: int) -> None:
+        assert 0 <= position <= len(self.text.data)
+        self.position = position
 
     @update_line
     def to_prev_line(self, n: int = 1) -> None:
