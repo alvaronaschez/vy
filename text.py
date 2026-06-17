@@ -33,37 +33,42 @@ class Text:
             except IsADirectoryError as e:
                 raise e
 
-    def _delete(self, begin: int, count: int) -> None:
+    def _delete_raw(self, begin: int, count: int) -> None:
         assert count >= 0
         assert 0 <= begin <= len(self.data)
 
         if not self.data or count == 0 or begin == len(self.data):
             return
 
-        self.redo_stack = []
-        self.undo_stack.append(Insert.fromDelete(begin, count, self.data))
-
-        # delete
         self.data = self.data[:begin] + self.data[begin + count :]
 
-    def _insert(self, position: int, text: str) -> None:
+    def _insert_raw(self, position: int, text: str) -> None:
         assert 0 <= position <= len(self.data)
         if not text:
             return
 
-        self.redo_stack = []
-        self.undo_stack.append(Delete.fromInsert(position, text))
-
-        # insert
         self.data = self.data[:position] + text + self.data[position:]
 
-    def _apply(self, command: Delete | Insert) -> None:
-        # TODO: move cursor
+    def _inverse(self, command: Delete | Insert) -> Delete | Insert:
         match command:
             case Delete(begin, count):
-                self._delete(begin, count)
+                return Insert.fromDelete(begin, count, self.data)
             case Insert(position, text):
-                self._insert(position, text)
+                return Delete.fromInsert(position, text)
+
+    def _apply_raw(self, command: Delete | Insert) -> None:
+        match command:
+            case Delete(begin, count):
+                self._delete_raw(begin, count)
+            case Insert(position, text):
+                self._insert_raw(position, text)
+
+    def _move_after(self, cursor: Cursor, command: Delete | Insert) -> None:
+        match command:
+            case Delete(begin, _):
+                cursor.to_position(begin)
+            case Insert(position, text):
+                cursor.to_position(position + len(text))
 
     def delete(self, begin: Cursor, end: Cursor, closed_open: bool = True) -> None:
         """
@@ -74,29 +79,42 @@ class Text:
             end = copy(end)
             end.next()
         count = end.position - begin.position
-        self._delete(begin.position, count)
+        if count <= 0:
+            return
+
+        command = Delete(begin.position, count)
+        self.undo_stack.append(self._inverse(command))
+        self.redo_stack.clear()
+        self._delete_raw(begin.position, count)
+        self._move_after(begin, command)
 
     def insert(self, cursor: Cursor, text: str) -> None:
         if text:
-            self._insert(cursor.position, text)
-            # cursor.to_position(cursor.position+len(text)-1)
-            cursor.to_position(cursor.position+len(text))
+            command = Insert(cursor.position, text)
+            self.undo_stack.append(self._inverse(command))
+            self.redo_stack.clear()
+            self._insert_raw(cursor.position, text)
+            self._move_after(cursor, command)
 
-    def undo(self) -> None:
+    def undo(self, cursor: Cursor) -> None:
         if not self.undo_stack:
             return
         command = self.undo_stack.pop()
-        self._apply(command)
+        inverse = self._inverse(command)
 
-        # change must go to the redo_stack instead of to the undo_stack
-        command = self.undo_stack.pop()
-        self.redo_stack.append(command)
+        self._apply_raw(command)
+        self.redo_stack.append(inverse)
+        self._move_after(cursor, command)
 
-    def redo(self) -> None:
+    def redo(self, cursor: Cursor) -> None:
         if not self.redo_stack:
             return
         command = self.redo_stack.pop()
-        self._apply(command)
+        inverse = self._inverse(command)
+
+        self._apply_raw(command)
+        self.undo_stack.append(inverse)
+        self._move_after(cursor, command)
 
     def save(self) -> None:
         if self.file_path is None:

@@ -224,9 +224,9 @@ class Vy:
                     case "i":
                         self.mode = self.Mode.INSERT
                     case "u":
-                        self.buffer.undo()
+                        self.buffer.undo(self.cursor)
                     case Key.CTRL_R:
-                        self.buffer.redo()
+                        self.buffer.redo(self.cursor)
                     case _:
                         pass
             case self.Mode.INSERT:
