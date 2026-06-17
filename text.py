@@ -79,11 +79,12 @@ class Text:
             end = copy(end)
             end.next()
         count = end.position - begin.position
-        self._delete(begin.position, count)
+        # self._delete(begin.position, count)
+        self._apply(Delete(begin.position, count))
 
     def insert(self, position: Cursor, text: str) -> None:
-        self._insert(position.position, text)
-        # self._apply(Insert(position.position, text))
+        # self._insert(position.position, text)
+        self._apply(Insert(position.position, text))
 
     def undo(self) -> None:
         if not self.undo_stack:

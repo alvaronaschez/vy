@@ -2,7 +2,7 @@
 
 import curses
 from dataclasses import InitVar, dataclass, field
-from enum import StrEnum
+from enum import Enum, StrEnum
 from functools import partial
 from typing import Any, Callable, NamedTuple, Self
 
@@ -110,7 +110,14 @@ class Vy:
     x_off: int = 0  # first column to print
     x_goal: int = 0
     view_port: ViewPort | None = None
+
+    insert_buffer: str = ""
+
     quit: bool = False
+
+    Mode = Enum("Mode", ["NORMAL", "INSERT"])
+
+    mode: Mode = Mode.NORMAL
 
     class Config:
         TAB_SIZE = 8
@@ -170,7 +177,7 @@ class Vy:
         end.to_next_line(height)
 
         # text: str
-        text: str | list[str] = self.buffer.get_range(begin, end)
+        text: Any = self.buffer.get_range(begin, end)
         if end.get_line_idx() == self.buffer.line_count() - 1:
             # insert eof character, cursor is allowed to sit there
             text += " "
@@ -198,21 +205,35 @@ class Vy:
     def read_key_(self) -> None:
         k = self._read_key()
 
-        match k:
-            case "q":
-                self.quit = True
-            case Ctrl.A:
-                self.quit = True
-            case "h":
-                self.cursor_left()
-            case "j":
-                self.cursor_down()
-            case "k":
-                self.cursor_up()
-            case "l":
-                self.cursor_right()
-            case _:
-                pass
+        match self.mode:
+            case self.Mode.NORMAL:
+                match k:
+                    case "q":
+                        self.quit = True
+                    case Key.CTRL_Q:
+                        self.quit = True
+                    case "h":
+                        self.cursor_left()
+                    case "j":
+                        self.cursor_down()
+                    case "k":
+                        self.cursor_up()
+                    case "l":
+                        self.cursor_right()
+                    case "i":
+                        self.mode = self.Mode.INSERT
+                    case "u":
+                        self.buffer.undo()
+                    case _:
+                        pass
+            case self.Mode.INSERT:
+                match k:
+                    case Key.ESC:
+                        self.buffer.insert(self.cursor, self.insert_buffer)
+                        self.insert_buffer = ""
+                        self.mode = self.Mode.NORMAL
+                    case _:
+                        self.insert_buffer += k
 
     def run(self) -> None:
         while not self.quit:
@@ -248,38 +269,39 @@ class CursesContextManager:
         curses.endwin()
 
 
-class Ctrl(StrEnum):
-    A = chr(1)
-    B = chr(2)
-    C = chr(3)
-    D = chr(4)
-    E = chr(5)
-    F = chr(6)
-    G = chr(7)
-    H = chr(8)
-    I = chr(9)
-    J = chr(10)
-    K = chr(11)
-    L = chr(12)
-    M = chr(13)
-    N = chr(14)
-    O = chr(15)
-    P = chr(16)
-    Q = chr(17)
-    R = chr(18)
-    S = chr(19)
-    T = chr(20)
-    U = chr(21)
-    V = chr(22)
-    W = chr(23)
-    X = chr(24)
-    Y = chr(25)
-    Z = chr(26)
-    OPEN_BRACKET = chr(27)  # [
-    SLASH = chr(27)  # /
-    CLOSE_BRACKET = chr(29)  # ]
-    CARET = chr(30)  # ^
-    UNDERSCORE = chr(30)  # _
+class Key(StrEnum):
+    CTRL_A = chr(1)
+    CTRL_B = chr(2)
+    CTRL_C = chr(3)
+    CTRL_D = chr(4)
+    CTRL_E = chr(5)
+    CTRL_F = chr(6)
+    CTRL_G = chr(7)
+    CTRL_H = chr(8)
+    CTRL_I = chr(9)
+    CTRL_J = chr(10)
+    CTRL_K = chr(11)
+    CTRL_L = chr(12)
+    CTRL_M = chr(13)
+    CTRL_N = chr(14)
+    CTRL_O = chr(15)
+    CTRL_P = chr(16)
+    CTRL_Q = chr(17)
+    CTRL_R = chr(18)
+    CTRL_S = chr(19)
+    CTRL_T = chr(20)
+    CTRL_U = chr(21)
+    CTRL_V = chr(22)
+    CTRL_W = chr(23)
+    CTRL_X = chr(24)
+    CTRL_Y = chr(25)
+    CTRL_Z = chr(26)
+    ESC = chr(27)
+    CTRL_OPEN_BRACKET = chr(27)  # [
+    CTRL_SLASH = chr(27)  # /
+    CTRL_CLOSE_BRACKET = chr(29)  # ]
+    CTRL_CARET = chr(30)  # ^
+    CTRL_UNDERSCORE = chr(30)  # _
 
 
 def print_view_port(view_port: ViewPort, window: curses.window) -> None:
