@@ -63,8 +63,8 @@ class Text:
 
     def _apply(self, command: Delete | Insert) -> None:
         match command:
-            case Delete(begin, end):
-                self._delete(begin, end)
+            case Delete(begin, count):
+                self._delete(begin, count)
             case Insert(position, text):
                 self._insert(position, text)
         for cursor in self.cursors:
@@ -202,13 +202,14 @@ class Cursor:
                 * At or after insertion: shifts right by inserted length
         """
         match command:
-            case Delete(begin, end):
+            case Delete(begin, count):
+                end = begin + count
                 if self.position < begin:
                     return
                 elif self.position < end:
                     self.position = begin
                 else:
-                    self.position -= end - begin + 1
+                    self.position -= count
             case Insert(position, text):
                 if self.position < position:
                     return
