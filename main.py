@@ -1,7 +1,7 @@
 # from __future__ import annotations  # python < 3.14
 
 import curses
-from dataclasses import dataclass, field, InitVar
+from dataclasses import InitVar, dataclass, field
 from enum import StrEnum
 from functools import partial
 from typing import Any, Callable, NamedTuple, Self
@@ -38,8 +38,7 @@ def expand_tabs(s: str, tab_size: int) -> str:
 
 def cut_line(s: str, tab_size: int, offset: int, width: int) -> str:
     result: str = expand_tabs(s, tab_size)
-    # result = wcwidth.clip(result, offset, offset + width, control_codes='ignore')
-    result = wcwidth.clip(result, offset, offset + width)
+    result = wcwidth.clip(result, offset, offset + width, control_codes="ignore")
     return result
 
 
@@ -88,7 +87,7 @@ class ViewPort:
     # positions: list[BookMark]
 
 
-type ReadKeyCallback = Callable[[], Key | str]
+type ReadKeyCallback = Callable[[], str]
 type PrintCallback = Callable[[ViewPort], None]
 type GetViewPortSizeCallback = Callable[[], ViewPortSize]  # (height, width)
 
@@ -171,7 +170,7 @@ class Vy:
         end.to_next_line(height)
 
         # text: str
-        text: Any = self.buffer.get_range(begin, end)
+        text: str | list[str] = self.buffer.get_range(begin, end)
         if end.get_line_idx() == self.buffer.line_count() - 1:
             # insert eof character, cursor is allowed to sit there
             text += " "
@@ -183,7 +182,6 @@ class Vy:
         text = [
             cut_line(line, self.Config.TAB_SIZE, self.x_off, width) for line in text
         ]
-        # cursor = self.cursor_to_view_port(self.cursor, positions, lines)
 
         cursor_y = cursor_line_idx - self.y_off
         cursor_x = self.cursor.get_column(tab_size=self.Config.TAB_SIZE) - self.x_off
@@ -201,17 +199,17 @@ class Vy:
         k = self._read_key()
 
         match k:
-            case Key.q:
+            case "q":
                 self.quit = True
-            case Key.CTRL_Q:
+            case Ctrl.A:
                 self.quit = True
-            case Key.h:
+            case "h":
                 self.cursor_left()
-            case Key.j:
+            case "j":
                 self.cursor_down()
-            case Key.k:
+            case "k":
                 self.cursor_up()
-            case Key.l:
+            case "l":
                 self.cursor_right()
             case _:
                 pass
@@ -250,85 +248,38 @@ class CursesContextManager:
         curses.endwin()
 
 
-class Key(StrEnum):
-    CTRL_A = chr(1)
-    CTRL_B = chr(2)
-    CTRL_C = chr(3)
-    CTRL_D = chr(4)
-    CTRL_E = chr(5)
-    CTRL_F = chr(6)
-    CTRL_G = chr(7)
-    CTRL_H = chr(8)
-    CTRL_I = chr(9)
-    CTRL_J = chr(10)
-    CTRL_K = chr(11)
-    CTRL_L = chr(12)
-    CTRL_M = chr(13)
-    CTRL_N = chr(14)
-    CTRL_O = chr(15)
-    CTRL_P = chr(16)
-    CTRL_Q = chr(17)
-    CTRL_R = chr(18)
-    CTRL_S = chr(19)
-    CTRL_T = chr(20)
-    CTRL_U = chr(21)
-    CTRL_V = chr(22)
-    CTRL_W = chr(23)
-    CTRL_X = chr(24)
-    CTRL_Y = chr(25)
-    CTRL_Z = chr(26)
-    a = "a"
-    b = "b"
-    c = "c"
-    d = "d"
-    e = "e"
-    f = "f"
-    g = "g"
-    h = "h"
-    i = "i"
-    j = "j"
-    k = "k"
-    l = "l"  # noqa: E741
-    m = "m"
-    n = "n"
-    o = "o"
-    p = "p"
-    q = "q"
-    r = "r"
-    s = "s"
-    t = "t"
-    u = "u"
-    v = "v"
-    w = "w"
-    x = "x"
-    y = "y"
-    z = "z"
-    A = "A"
-    B = "B"
-    C = "C"
-    D = "D"
-    E = "E"
-    F = "F"
-    G = "G"
-    H = "H"
-    I = "I"
-    J = "J"
-    K = "K"
-    L = "L"
-    M = "M"
-    N = "N"
-    O = "O"
-    P = "P"
-    Q = "Q"
-    R = "R"
-    S = "S"
-    T = "T"
-    U = "U"
-    V = "V"
-    W = "W"
-    X = "X"
-    Y = "Y"
-    Z = "Z"
+class Ctrl(StrEnum):
+    A = chr(1)
+    B = chr(2)
+    C = chr(3)
+    D = chr(4)
+    E = chr(5)
+    F = chr(6)
+    G = chr(7)
+    H = chr(8)
+    I = chr(9)
+    J = chr(10)
+    K = chr(11)
+    L = chr(12)
+    M = chr(13)
+    N = chr(14)
+    O = chr(15)
+    P = chr(16)
+    Q = chr(17)
+    R = chr(18)
+    S = chr(19)
+    T = chr(20)
+    U = chr(21)
+    V = chr(22)
+    W = chr(23)
+    X = chr(24)
+    Y = chr(25)
+    Z = chr(26)
+    OPEN_BRACKET = chr(27)  # [
+    SLASH = chr(27)  # /
+    CLOSE_BRACKET = chr(29)  # ]
+    CARET = chr(30)  # ^
+    UNDERSCORE = chr(30)  # _
 
 
 def print_view_port(view_port: ViewPort, window: curses.window) -> None:

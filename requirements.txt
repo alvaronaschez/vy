@@ -5,3 +5,5 @@ wcwidth>=0.8.1
 
 # dev
 mypy>=2.1.0
+black
+isort
