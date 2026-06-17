@@ -8,6 +8,11 @@ import wcwidth
 
 
 class Text:
+    """Document buffer and edit state for a single text file.
+
+    Edit operations mutate the document and the cursor passed into them.
+    """
+
     # TODO: poll file updates
     # ask if reload when changed from outside
     # os.stat(filename).st_mtime? watchdog?
@@ -122,11 +127,7 @@ class Text:
             file.write(self.data)
 
     def get_cursor(self) -> Cursor:
-        """
-        Get a new cursor and subscribe it to events sent from this Text
-        """
-        c = Cursor(self)
-        return c
+        return Cursor(self)
 
     def get_lines(self, begin: Cursor, end: Cursor) -> list[str]:
         return self.get_range(begin, end).splitlines(keepends=True)
@@ -144,14 +145,7 @@ R = TypeVar("R")
 
 class Cursor:
     """
-    Represents a position within a Text object that stays consistent
-    as the text is modified.
-
-    A Cursor is tied to a specific Text instance and is updated when
-    edit commands are applied.
-
-    Instances should not be created directly; use `Text.get_cursor()`
-    so the Text can track and update it.
+    Mutable position within a single Text buffer.
 
     Attributes:
         position (int): Zero-based cursor position in the text. This

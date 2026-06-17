@@ -88,14 +88,14 @@ class ViewPort:
 
 
 type ReadKeyCallback = Callable[[], str]
-type PrintCallback = Callable[[ViewPort], None]
+type RenderCallback = Callable[[ViewPort], None]
 type GetViewPortSizeCallback = Callable[[], ViewPortSize]  # (height, width)
 
 
 class Vy:
     __slots__ = (
         "_read_key",
-        "_print",
+        "_render",
         "_get_view_port_size",
         "buffer",
         "cursor",
@@ -118,12 +118,12 @@ class Vy:
     def __init__(
         self: Self,
         read_key: ReadKeyCallback,
-        print_: PrintCallback,
+        render: RenderCallback,
         get_view_port_size: GetViewPortSizeCallback,
         file_path: str | None = None,
     ) -> None:
         self._read_key = read_key
-        self._print = print_
+        self._render = render
         self._get_view_port_size = get_view_port_size
 
         self.buffer: Text = Text(file_path)
@@ -201,9 +201,9 @@ class Vy:
 
         return self.view_port
 
-    def print(self) -> None:
+    def render(self) -> None:
         self.view_port = self.build_view_port()
-        self._print(self.view_port)
+        self._render(self.view_port)
 
     def read_key_(self) -> None:
         k = self._read_key()
@@ -242,7 +242,7 @@ class Vy:
 
     def run(self) -> None:
         while not self.quit:
-            self.print()
+            self.render()
             self.read_key_()
 
 
@@ -343,12 +343,12 @@ def main() -> None:
         get_view_port_size: GetViewPortSizeCallback = lambda: ViewPortSize(
             *stdscr.getmaxyx()
         )
-        print_: PrintCallback = partial(print_view_port, window=stdscr)
+        render: RenderCallback = partial(print_view_port, window=stdscr)
 
         Vy(
             read_key=read_key,
             get_view_port_size=get_view_port_size,
-            print_=print_,
+            render=render,
             # file_path="foo.test",
             # file_path="main.py",
             file_path="sqlite3.c",
