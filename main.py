@@ -174,7 +174,8 @@ class Vy:
         begin.to_prev_line(cursor_line_idx - self.y_off)
 
         end = begin.clone()
-        end.to_next_line(height)
+        end.to_next_line(height - 1)
+        end.to_end_of_line()
 
         # text: str
         text: Any = self.buffer.get_range(begin, end)
@@ -224,17 +225,14 @@ class Vy:
                         self.mode = self.Mode.INSERT
                     case "u":
                         self.buffer.undo()
+                    case Key.CTRL_R:
+                        self.buffer.redo()
                     case _:
                         pass
             case self.Mode.INSERT:
                 match k:
                     case Key.ESC:
-                        # BIG performance issue, even with small files
-                        # self.buffer.data = self.buffer.data[:self.cursor.position] + self.insert_buffer + self.buffer.data[self.cursor.position:]
-                        # self.buffer.data = f'{self.buffer.data[:self.cursor.position]}{self.insert_buffer}{self.buffer.data[self.cursor.position:]}'
-                        # self.buffer.data = "".join((self.buffer.data[:self.cursor.position], self.insert_buffer, self.buffer.data[self.cursor.position:]))
-                        # self.buffer.insert(self.cursor, self.insert_buffer)
-                        self.buffer.data = "why is this not printed?"
+                        self.buffer.insert(self.cursor, self.insert_buffer)
                         self.insert_buffer = ""
                         self.mode = self.Mode.NORMAL
                     case _:
@@ -256,6 +254,8 @@ class CursesContextManager:
         curses.raw()
         curses.nonl()
         self.stdscr.keypad(True)
+
+        curses.set_escdelay(25)
 
         curses.start_color()
         curses.use_default_colors()
@@ -329,7 +329,7 @@ def print_view_port(view_port: ViewPort, window: curses.window) -> None:
 
     # window.refresh()
     window.noutrefresh()  # stage update (no draw)
-    curses.doupdate()     # flush everything at once
+    curses.doupdate()  # flush everything at once
 
 
 def main() -> None:
@@ -347,9 +347,9 @@ def main() -> None:
             read_key=read_key,
             get_view_port_size=get_view_port_size,
             print_=print_,
-            file_path="foo.test",
+            # file_path="foo.test",
             # file_path="main.py",
-            # file_path="sqlite3.c",
+            file_path="sqlite3.c",
         ).run()
 
 
