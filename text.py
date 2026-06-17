@@ -8,7 +8,8 @@ from weakref import WeakSet
 import wcwidth
 
 
-@dataclass(slots=True)
+#@dataclass(slots=True)
+@dataclass
 class Text:
     # TODO: poll file updates
     # ask if reload when changed from outside

@@ -229,7 +229,12 @@ class Vy:
             case self.Mode.INSERT:
                 match k:
                     case Key.ESC:
-                        self.buffer.insert(self.cursor, self.insert_buffer)
+                        # BIG performance issue, even with small files
+                        # self.buffer.data = self.buffer.data[:self.cursor.position] + self.insert_buffer + self.buffer.data[self.cursor.position:]
+                        # self.buffer.data = f'{self.buffer.data[:self.cursor.position]}{self.insert_buffer}{self.buffer.data[self.cursor.position:]}'
+                        # self.buffer.data = "".join((self.buffer.data[:self.cursor.position], self.insert_buffer, self.buffer.data[self.cursor.position:]))
+                        # self.buffer.insert(self.cursor, self.insert_buffer)
+                        self.buffer.data = "why is this not printed?"
                         self.insert_buffer = ""
                         self.mode = self.Mode.NORMAL
                     case _:
@@ -305,7 +310,8 @@ class Key(StrEnum):
 
 
 def print_view_port(view_port: ViewPort, window: curses.window) -> None:
-    window.clear()
+    # window.clear()
+    window.erase()
     vp_height, vp_width = window.getmaxyx()
 
     for i, line in enumerate(view_port.lines):
@@ -320,6 +326,10 @@ def print_view_port(view_port: ViewPort, window: curses.window) -> None:
 
     # print cursor
     window.move(view_port.cursor.y, view_port.cursor.x)
+
+    # window.refresh()
+    window.noutrefresh()  # stage update (no draw)
+    curses.doupdate()     # flush everything at once
 
 
 def main() -> None:
@@ -337,9 +347,9 @@ def main() -> None:
             read_key=read_key,
             get_view_port_size=get_view_port_size,
             print_=print_,
-            # file_path="foo.test",
+            file_path="foo.test",
             # file_path="main.py",
-            file_path="sqlite3.c",
+            # file_path="sqlite3.c",
         ).run()
 
 
