@@ -160,11 +160,11 @@ class Vy:
     def build_view_port(self) -> ViewPort:
         height, width = self._get_view_port_size()
 
-        cursor_line_idx = self.cursor.get_line_idx()
-        if self.y_off > cursor_line_idx:
-            self.y_off = cursor_line_idx
-        if cursor_line_idx >= self.y_off + height:
-            self.y_off = cursor_line_idx - height + 1
+        cursor_line = self.cursor.get_line_idx()
+        if self.y_off > cursor_line:
+            self.y_off = cursor_line
+        if cursor_line >= self.y_off + height:
+            self.y_off = cursor_line - height + 1
 
         cursor_column = self.cursor.get_column(tab_size=self.Config.TAB_SIZE)
         if cursor_column < self.x_off:
@@ -173,7 +173,7 @@ class Vy:
             self.x_off = cursor_column - width + 1
 
         begin = self.cursor.clone()
-        begin.to_prev_line(cursor_line_idx - self.y_off)
+        begin.to_prev_line(cursor_line - self.y_off)
 
         end = begin.clone()
         end.to_next_line(height - 1)
@@ -188,18 +188,77 @@ class Vy:
         # text: list[str]
         text = text.splitlines(keepends=True)
         text = [line.replace("\n", " ") for line in text]
-        # cursor_line = text[cursor_line_idx - self.y_off]
         text = [
             cut_line(line, self.Config.TAB_SIZE, self.x_off, width) for line in text
         ]
 
-        cursor_y = cursor_line_idx - self.y_off
-        cursor_x = self.cursor.get_column(tab_size=self.Config.TAB_SIZE) - self.x_off
+        cursor_y = cursor_line - self.y_off
+        cursor_x = cursor_column - self.x_off
         cursor = ScreenCursor(cursor_y, cursor_x)
 
         self.view_port = ViewPort(height=height, width=width, lines=text, cursor=cursor)
 
         return self.view_port
+
+    def build_view_port2(self) -> ViewPort:
+        height, width = self._get_view_port_size()
+
+        inserted_lines = self.insert_buffer.count("\n")
+        cursor_line = self.cursor.get_line_idx() + inserted_lines
+        if self.y_off > cursor_line:
+            self.y_off = cursor_line
+        if cursor_line >= self.y_off + height:
+            self.y_off = cursor_line - height + 1
+
+        begin = self.cursor.clone()
+        begin.to_prev_line(cursor_line - self.y_off)
+
+        end = begin.clone()
+        end.to_next_line(height - 1)
+        end.to_end_of_line()
+
+        # text: str
+        if self.mode != self.Mode.INSERT:
+            text: Any = self.buffer.get_range(begin, end)
+        else:
+            first = self.buffer.get_range(begin, self.cursor)
+            last = self.buffer.get_range(self.cursor, end)
+            text = first + self.insert_buffer + last
+
+        if end.get_line_idx() == self.buffer.line_count() - 1:
+            # insert eof character, cursor is allowed to sit there
+            text += " "
+        # keep line endings and replace them with whitespace
+        # text: list[str]
+        text = text.splitlines(keepends=True)
+        text = [line.replace("\n", " ") for line in text]
+        text = [
+            cut_line(line, self.Config.TAB_SIZE, self.x_off, width) for line in text
+        ]
+
+        if self.mode != self.Mode.INSERT:
+            cursor_column = self.cursor.get_column(tab_size=self.Config.TAB_SIZE)
+        else:
+            if inserted_lines:
+                # TODO: cursor_column = ...
+                cursor_column = 0
+            else:
+                # TODO: cursor_column = ...
+                cursor_column = 0
+
+        if cursor_column < self.x_off:
+            self.x_off = cursor_column
+        elif cursor_column - self.x_off >= width:
+            self.x_off = cursor_column - width + 1
+
+        cursor_y = cursor_line - self.y_off
+        cursor_x = cursor_column - self.x_off
+        cursor = ScreenCursor(cursor_y, cursor_x)
+
+        self.view_port = ViewPort(height=height, width=width, lines=text, cursor=cursor)
+
+        return self.view_port
+
 
     def render(self) -> None:
         self.view_port = self.build_view_port()
