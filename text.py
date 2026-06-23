@@ -100,15 +100,41 @@ class Text:
             self._insert_raw(cursor.position, text)
             self._move_after(cursor, command)
 
+    # def undo(self, cursor: Cursor) -> None:
+    #     if not self.undo_stack:
+    #         return
+    #     command = self.undo_stack.pop()
+    #     inverse = self._inverse(command)
+
+    #     self._move_after(cursor, command)
+    #     self._apply_raw(command)
+    #     self.redo_stack.append(inverse)
+
+    # def redo(self, cursor: Cursor) -> None:
+    #     if not self.redo_stack:
+    #         return
+    #     command = self.redo_stack.pop()
+    #     inverse = self._inverse(command)
+
+    #     self._move_after(cursor, command)
+    #     self._apply_raw(command)
+    #     self.undo_stack.append(inverse)
+
     def undo(self, cursor: Cursor) -> None:
         if not self.undo_stack:
             return
         command = self.undo_stack.pop()
         inverse = self._inverse(command)
 
-        self._apply_raw(command)
+        match command:
+            case Delete(begin, count):
+                self._move_after(cursor, command)
+                self._delete_raw(begin, count)
+            case Insert(position, text):
+                self._insert_raw(position, text)
+                self._move_after(cursor, command)
+
         self.redo_stack.append(inverse)
-        self._move_after(cursor, command)
 
     def redo(self, cursor: Cursor) -> None:
         if not self.redo_stack:
@@ -116,9 +142,15 @@ class Text:
         command = self.redo_stack.pop()
         inverse = self._inverse(command)
 
-        self._apply_raw(command)
+        match command:
+            case Delete(begin, count):
+                self._move_after(cursor, command)
+                self._delete_raw(begin, count)
+            case Insert(position, text):
+                self._insert_raw(position, text)
+                self._move_after(cursor, command)
+
         self.undo_stack.append(inverse)
-        self._move_after(cursor, command)
 
     def save(self) -> None:
         if self.file_path is None:
