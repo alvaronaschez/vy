@@ -60,20 +60,6 @@ class Text:
             case Insert(position, text):
                 return Delete.fromInsert(position, text)
 
-    def _apply_raw(self, command: Delete | Insert) -> None:
-        match command:
-            case Delete(begin, count):
-                self._delete_raw(begin, count)
-            case Insert(position, text):
-                self._insert_raw(position, text)
-
-    def _move_after(self, cursor: Cursor, command: Delete | Insert) -> None:
-        match command:
-            case Delete(begin, _):
-                cursor.to_position(begin)
-            case Insert(position, text):
-                cursor.to_position(position + len(text))
-
     def delete(self, begin: Cursor, end: Cursor, closed_open: bool = True) -> None:
         """
         closed interval [begin, end]
@@ -90,7 +76,6 @@ class Text:
         self.undo_stack.append(self._inverse(command))
         self.redo_stack.clear()
         self._delete_raw(begin.position, count)
-        self._move_after(begin, command)
 
     def insert(self, cursor: Cursor, text: str) -> None:
         if text:
@@ -98,27 +83,7 @@ class Text:
             self.undo_stack.append(self._inverse(command))
             self.redo_stack.clear()
             self._insert_raw(cursor.position, text)
-            self._move_after(cursor, command)
-
-    # def undo(self, cursor: Cursor) -> None:
-    #     if not self.undo_stack:
-    #         return
-    #     command = self.undo_stack.pop()
-    #     inverse = self._inverse(command)
-
-    #     self._move_after(cursor, command)
-    #     self._apply_raw(command)
-    #     self.redo_stack.append(inverse)
-
-    # def redo(self, cursor: Cursor) -> None:
-    #     if not self.redo_stack:
-    #         return
-    #     command = self.redo_stack.pop()
-    #     inverse = self._inverse(command)
-
-    #     self._move_after(cursor, command)
-    #     self._apply_raw(command)
-    #     self.undo_stack.append(inverse)
+            cursor.to_position(cursor.position + len(text))
 
     def undo(self, cursor: Cursor) -> None:
         if not self.undo_stack:
@@ -128,11 +93,11 @@ class Text:
 
         match command:
             case Delete(begin, count):
-                self._move_after(cursor, command)
+                cursor.to_position(begin)
                 self._delete_raw(begin, count)
             case Insert(position, text):
                 self._insert_raw(position, text)
-                self._move_after(cursor, command)
+                cursor.to_position(position + len(text))
 
         self.redo_stack.append(inverse)
 
@@ -144,11 +109,11 @@ class Text:
 
         match command:
             case Delete(begin, count):
-                self._move_after(cursor, command)
+                cursor.to_position(begin)
                 self._delete_raw(begin, count)
             case Insert(position, text):
                 self._insert_raw(position, text)
-                self._move_after(cursor, command)
+                cursor.to_position(position + len(text))
 
         self.undo_stack.append(inverse)
 
@@ -222,39 +187,6 @@ class Cursor:
         # return wrapper
         # avoid mypy error
         return cast(Callable[Concatenate["Cursor", P], R], wrapper)
-
-    @update_line
-    def apply(self, command: Delete | Insert) -> None:
-        """
-        Update the cursor position in response to a text edit.
-
-        Args:
-            command: The edit operation applied to the text.
-
-        Behavior:
-            - Delete(begin, end):
-                * Before range: unchanged
-                * Inside range: moves to begin
-                * After range: shifts left by deleted length
-
-            - Insert(position, text):
-                * Before insertion: unchanged
-                * At or after insertion: shifts right by inserted length
-        """
-        match command:
-            case Delete(begin, count):
-                end = begin + count
-                if self.position < begin:
-                    return
-                elif self.position < end:
-                    self.position = begin
-                else:
-                    self.position -= count
-            case Insert(position, text):
-                if self.position < position:
-                    return
-                else:
-                    self.position += len(text)
 
     def clone(self) -> Cursor:
         new = copy(self)
